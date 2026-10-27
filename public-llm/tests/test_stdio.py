@@ -9,12 +9,12 @@ from pathlib import Path
 
 import anyio
 import pytest
-from conftest import config_dict
+from conftest import EXAMPLE_IP, config_dict
 from mcp.client.client import Client
 from mcp.client.stdio import StdioServerParameters
 
 from quiettv_mcp.capture import PNG_SIGNATURE
-from quiettv_mcp.server import TOOL_NAMES
+from quiettv_mcp.server import TOOL_NAMES, WAKE_TOOL_NAMES
 
 HERE = Path(__file__).resolve().parent
 
@@ -60,6 +60,31 @@ def test_maintenance_tools_need_owner_flag(config_file):
     _, on = _session(StdioServerParameters(command=exe, args=["serve", "--config", str(config_file), "--enable-maintenance"]), names)
     assert "maintenance_apply" not in off
     assert {"maintenance_plan", "maintenance_apply"} <= on
+
+
+def test_console_entry_declares_tv_wake_only_when_owner_enables_it(tmp_path, key_file):
+    """List only: calling tv_wake through the console entry would put a real broadcast on this machine's LAN."""
+    exe = _console_entry()
+    cfg = tmp_path / "wake-config.json"
+    cfg.write_text(json.dumps(config_dict(key_file, ip=EXAMPLE_IP, wake={"enabled": True})), encoding="utf-8")
+
+    async def names(client):
+        return {t.name for t in (await client.list_tools()).tools}
+    _, on = _session(StdioServerParameters(command=exe, args=["serve", "--config", str(cfg)]), names)
+    assert on == set(TOOL_NAMES) | set(WAKE_TOOL_NAMES)
+
+
+def test_stdio_tv_wake_sends_one_recorded_packet(tmp_path, key_file):
+    cfg = tmp_path / "wake-config.json"
+    cfg.write_text(json.dumps(config_dict(key_file, ip=EXAMPLE_IP, wake={"enabled": True, "port": 7})), encoding="utf-8")
+    record = tmp_path / "packets.jsonl"
+    params = StdioServerParameters(command=sys.executable,
+                                   args=[str(HERE / "stdio_wake_fixture_server.py"), str(cfg), str(record)])
+    _, result = _session(params, lambda client: client.call_tool("tv_wake", {}))
+    assert not result.is_error, result.content
+    assert result.structured_content["requested"] is True and result.structured_content["awake_verified"] is False
+    lines = [json.loads(line) for line in record.read_text(encoding="utf-8").splitlines()]
+    assert lines == [["ff" * 6 + "020000000001" * 16, "10.20.30.255", 7]]
 
 
 def test_stdio_status_and_capture_against_fake_tv(tmp_path, key_file, fake, key):

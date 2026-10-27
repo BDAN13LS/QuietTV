@@ -21,10 +21,11 @@ def test_setup_with_hidden_key_writes_private_files(tmp_path):
     cfg = tmp_path / "cfg" / "config.json"
     secret = "typed-secret-0123456789abcdef"
     out = io.StringIO()
-    run_setup(cfg, input_fn=_answers("UN43U8000FBXZA", "1300.8", EXAMPLE_IP, "02-00-00-00-00-01", "", ""),
+    run_setup(cfg, input_fn=_answers("UN43U8000FBXZA", "1300.8", EXAMPLE_IP, "02-00-00-00-00-01", "", "", ""),
               secret_fn=lambda prompt: secret, out=out)
     config = load_config(cfg)
     assert config.tv_mac == "02:00:00:00:00:01"
+    assert config.wake is None and "wake" not in json.loads(cfg.read_text(encoding="utf-8"))
     assert config.control_key_file.read_text(encoding="ascii").strip() == secret
     assert secret not in cfg.read_text(encoding="utf-8")
     assert secret not in out.getvalue()
@@ -53,6 +54,22 @@ def test_client_fragments_parse_in_each_official_shape(config_file):
     opencode = json.loads(frags["opencode"])["mcp"]["quiettv"]
     assert opencode["type"] == "local" and opencode["command"][0] == "/opt/venv/bin/python"
     assert all("key" not in text.lower().replace("control_key_file", "") for text in frags.values())
+
+
+def test_claude_code_fragment_is_its_mcp_add_command(config_file, monkeypatch):
+    import shlex
+    import subprocess
+
+    import quiettv_mcp.setup_cli as sc
+    args = ["-m", "quiettv_mcp", "serve", "--config", "/path with space/config.json"]
+    expected = ["claude", "mcp", "add", "--transport", "stdio", "--scope", "user", "quiettv", "--",
+                "/opt/venv/bin/python", *args]
+    monkeypatch.setattr(sc.sys, "platform", "linux")
+    line = client_fragments(config_file, command=("/opt/venv/bin/python", args))["claude-code"].strip()
+    assert shlex.split(line) == expected
+    monkeypatch.setattr(sc.sys, "platform", "win32")
+    line = client_fragments(config_file, command=("/opt/venv/bin/python", args))["claude-code"].strip()
+    assert line == subprocess.list2cmdline(expected) and '"/path with space/config.json"' in line
 
 
 def test_fragments_never_overwrite_or_touch_global_settings(config_file, tmp_path, monkeypatch):
