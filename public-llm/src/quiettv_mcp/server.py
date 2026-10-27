@@ -22,18 +22,25 @@ from .toolkit import MaintenanceError, MaintenanceGate, Operation
 log = logging.getLogger("quiettv_mcp")
 
 INSTRUCTIONS = (
-    "Controls one owner-configured TV on the local network. Every call re-checks the TV's identity "
-    "(model and MAC) and refuses on mismatch. Use tv_capture to see the screen after any control action: "
+    "Controls one owner-configured TV on the local network. Every call to the TV service re-checks the TV's "
+    "identity (model and MAC) and refuses on mismatch. Use tv_capture to see the screen after any control action: "
     "a control call being accepted is not proof that it worked. Captures show the UI layer only; the "
     "hardware video layer reads as black, so video and sound must be checked directly by a person."
+)
+WAKE_INSTRUCTIONS = (
+    " tv_wake only sends a Wake-on-LAN packet (a TV in standby cannot be identity-checked); it never confirms the "
+    "TV woke. Call tv_status afterwards: that is the identity-checked confirmation."
 )
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 CONTROL = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
+# A magic packet to a TV that is already on changes nothing, so a repeat is harmless.
+WAKE = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 MUTATION = ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=False)
 
 TOOL_NAMES = ("tv_capabilities", "tv_status", "tv_home", "tv_remote_key", "tv_launch_app", "tv_diagnostics",
               "tv_capture")
+WAKE_TOOL_NAMES = ("tv_wake",)
 MAINTENANCE_TOOL_NAMES = ("maintenance_plan", "maintenance_apply")
 
 CapsuleRef = Annotated[str | None, Field(default=None, pattern=r"^[A-Za-z0-9._-]{1,128}$",
@@ -71,7 +78,9 @@ def _device_call(fn, *args):
 def build_server(config: OwnerConfig, *, device: QuietTV | None = None, maintenance: MaintenanceGate | None = None) -> MCPServer:
     tv = device or QuietTV(config)
     gate = maintenance or MaintenanceGate(enabled=False, adapter=None)
-    server = MCPServer(name="quiettv", title="Quiet TV", version=__version__, instructions=INSTRUCTIONS)
+    wake = config.wake
+    server = MCPServer(name="quiettv", title="Quiet TV", version=__version__,
+                       instructions=INSTRUCTIONS + (WAKE_INSTRUCTIONS if wake else ""))
 
     @server.tool(title="Capabilities", annotations=READ_ONLY)
     def tv_capabilities(probe_device: bool = False) -> dict[str, Any]:
@@ -86,7 +95,8 @@ def build_server(config: OwnerConfig, *, device: QuietTV | None = None, maintena
                 "os": f"{config.profile.os} {config.profile.os_version}",
                 "arch": config.profile.arch,
             },
-            "tools": list(TOOL_NAMES) + (list(MAINTENANCE_TOOL_NAMES) if gate.enabled else []),
+            "tools": list(TOOL_NAMES) + (list(WAKE_TOOL_NAMES) if wake else [])
+                     + (list(MAINTENANCE_TOOL_NAMES) if gate.enabled else []),
             "remote_keys": list(config.profile.keys),
             "apps": list(config.allowed_apps),
             "capture": {
@@ -95,6 +105,9 @@ def build_server(config: OwnerConfig, *, device: QuietTV | None = None, maintena
                 "stale_fallback": "never (GET /screenshot is not used)",
                 "limits": "UI layer only; hardware video plane captures black; sound is not captured",
             },
+            "wake": ({"enabled": True, "tool": "tv_wake", "port": wake.port, "packets": wake.packets,
+                      "confirms_awake": False, "confirm_with": "tv_status"} if wake else
+                     {"enabled": False, "reason": "the owner config has no enabled \"wake\" section"}),
             "maintenance": gate.capabilities(),
         }
         if config.fixture_mode:
@@ -138,6 +151,15 @@ def build_server(config: OwnerConfig, *, device: QuietTV | None = None, maintena
             ImageContent(type="image", data=base64.b64encode(shot.png).decode("ascii"), mime_type="image/png"),
             TextContent(type="text", text=json.dumps(meta, sort_keys=True)),
         ])
+
+    if wake:
+        @server.tool(title="Wake TV (Wake-on-LAN)", annotations=WAKE)
+        def tv_wake() -> dict[str, Any]:
+            """Send a Wake-on-LAN magic packet to the owner-configured TV MAC on its LAN broadcast. Reports only
+            that the packet was sent, never that the TV woke: confirm with tv_status after about 15 seconds.
+            Needs the TV's network power-on setting (for example Network Standby / Power On with Mobile) and
+            the TV plugged in; Wi-Fi versus Ethernet support varies."""
+            return _device_call(tv.wake)
 
     if gate.enabled:
         @server.tool(title="Plan maintenance (dry run)", annotations=READ_ONLY)

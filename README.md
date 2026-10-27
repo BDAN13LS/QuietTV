@@ -2,14 +2,39 @@
 
 # QuietTV
 
-**A replacement launcher for Samsung TVs, built for privacy and speed.**
-QuietTV replaces your Samsung TV's Home screen with a fast, remote-first
-launcher. It also lets you choose optional Samsung tracking, ads, TV Plus,
-Bixby and bloat to remove. The planned installer needs no AI, subscription or coding. It uses
-owner-authorized root access for your exact model and firmware. Picture,
-sound, inputs, Settings, security, DRM, the app store and updates stay in
-place. Restoring what QuietTV changes is planned and is a required release
-gate. There is no self-installer for consumers today.
+**Replace Samsung Home, remove unwanted Samsung software, and keep the TV features you use.**
+
+**Verified TV: Samsung UN43U8000FBXZA · firmware 1300.8 · Tizen 9 · ARMv7.**
+Other TVs and firmware are not verified or supported yet.
+
+QuietTV is a replacement TV launcher with owner-authorized root and backend
+cleanup. The launcher and cleanup below are already running on the test TV.
+
+- **Adds:** our Home screen and startup experience, real app cards, remote
+  navigation, day/dusk/night wallpapers, appearance options, and optional
+  weather. Home returns to QuietTV; native apps still open normally.
+- **Removes on the test TV:** **27 optional payload folders**, including
+  Samsung analytics, targeted ads, Bixby/voice components, AI Companion,
+  content-recognition components, Guide, the standalone TV Plus app and
+  Security Center's information screen. These files and their quarantine
+  copies are physically off the TV; disabled registry entries remain.
+- **Also blocks:** selected remaining Samsung background services. Some
+  read-only components are blocked rather than deleted. This is not proof
+  that every tracking path is gone.
+- **Keeps:** Tizen's OS and drivers, picture/sound settings, TV/HDMI sources,
+  volume, core security, network, native streaming apps, Browser, and
+  Store/update dependencies.
+  Two shared packages are held until their dependencies are verified.
+- **Measured storage reclaimed:** about **250 MiB**, excluding the separate
+  analytics removal. RAM savings have not been measured.
+
+See the [full removed/blocked/kept inventory](docs/CLEANUP-STATUS.md).
+The public consumer installer and live restore tool are still being built;
+there is no download-and-install release yet. The planned setup needs no AI
+or subscription, with AI control available as an optional route.
+
+[Install plan and upstream tools](docs/INSTALL-OPTIONS.md) ·
+[Optional AI/MCP setup, wake, remote control and screenshots](public-llm/README.md)
 
 ![QuietTV home screen in day mode with scenic mountain artwork, app row and recent apps](docs/screenshots/home-day.png)
 
@@ -59,8 +84,11 @@ TV.*
    You see exactly what will change, then approve it.
 5. Check Home, remote, Settings and inputs with your remote.
 
-You will also need to sign in to your own Samsung account once, for a
-certificate tied to your TV. Developer Mode and that certificate do not give
+The current packaged-launcher route needs one Samsung sign-in for a signing
+profile tied to your TV. The aim is to automate and reuse it through the Helper,
+using existing installer work where possible—not make you manage certificates
+by hand. [Samsung documents this requirement](https://developer.samsung.com/smarttv/develop/tools/additional-tools/vscode/creating-certificates.html).
+Developer Mode and that certificate do not give
 root access; root comes from a separate step built for your exact model and
 firmware. Each owner gets their own keys, and nothing is shared.
 
@@ -173,12 +201,21 @@ Hardware claims need evidence at the exact commit. See
 
 ## Licence
 
-No repository-wide licence has been chosen yet; the owner is deciding. Component licences are in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+The original QuietTV code is released under the [MIT licence](LICENSE).
+Third-party components keep their own licences, listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The grant does not cover Samsung
+firmware or apps, third-party brand artwork, or unpublished source such as the
+IPTV player. See [public-llm/docs/LICENSING.md](public-llm/docs/LICENSING.md).
 
 ## For developers using AI assistants (optional)
 
-You never need AI for install, use or restore. If you want to drive a test
-TV from an AI client, see the optional MCP package in
-[public-llm/README.md](public-llm/README.md). Models may refuse device
-work; the plain command line is always available.
+AI is optional. The [complete MCP setup guide](public-llm/README.md) covers
+installation, private owner configuration, client setup for Claude Desktop,
+Claude Code, Codex and OpenCode, remote controls, screenshots and optional
+**Wake TV**. Wake sends a packet; a separate status check confirms the TV is
+reachable. Network power-on must be enabled on the TV.
+
+This controller currently needs an already-installed QuietTV service and its
+owner key. It does not yet install QuietTV on a stock TV. Some models refuse
+device/root work; compatibility with older Claude versions is untested. The
+same controls are available from the plain command line.

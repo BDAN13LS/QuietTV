@@ -17,6 +17,9 @@ service must implement for the capture tool to work.
    when reported, must equal the configured IP. Any mismatch: refuse, **no request to 4190**.
 4. **One request** to `http://<tv_ip>:4190/<route>` with header `X-QuietTV-Key: <key>`.
 
+`tv_wake` is the one exception (below): it uses no key and makes no HTTP request, because a TV in standby does
+not answer step 3.
+
 The target is always the literal IPv4 from the owner config (private range; no host names, so no DNS). Requests
 use `http.client` directly: proxies from the environment are ignored and redirects are never followed. Response
 bodies are read with a hard cap (JSON 256 KiB, capture 8 MiB).
@@ -31,7 +34,8 @@ bodies are read with a hard cap (JSON 256 KiB, capture 8 MiB).
 | `tv_launch_app` | `POST /launch/<appId>` | 200 `{accepted: true}` | app id, accepted |
 | `tv_diagnostics` | `POST /diagnostics` | 200 `{exit_code, stdout}` | redacted summary (below) |
 | `tv_capture` | `POST /capture` | 200 PNG (contract below) | `ImageContent` PNG + `TextContent` metadata |
-| `tv_capabilities` | none by default; `probe_device: true` runs the `tv_status` path | | profile, tools, keys, apps, capture and maintenance availability |
+| `tv_capabilities` | none by default; `probe_device: true` runs the `tv_status` path | | profile, tools, keys, apps, capture, wake and maintenance availability |
+| `tv_wake` | none: one or two UDP magic packets (see Wake-on-LAN) | nothing is read back | `requested`, `packets_sent`, `port`, `awake_verified: false`, `identity_checked: false`; never the MAC or address |
 
 Key codes (Linux input codes accepted by the TV's RemoteProbe): `back` 1, `ok` 28, `home` 63, `volume_down` 67,
 `volume_up` 68, `up` 103, `left` 105, `right` 106, `down` 108.
@@ -49,6 +53,28 @@ foreground app (the status whitelist omits it); only a fresh `tv_capture` confir
 
 HTTP 403 is reported as "wrong control key, or this PC's address is not on the TV service's controller
 allowlist". The service only accepts loopback and its configured controller address.
+
+## Wake-on-LAN (`tv_wake`, owner opt-in)
+
+Registered only when the owner config has `"wake": {"enabled": true, ...}`; otherwise the tool does not exist and
+`run wake` refuses with "Wake-on-LAN is off". Order of a wake call:
+
+1. **Cooldown** (local): a wake less than 5 s after the previous one in this process is refused. Nothing is sent.
+2. **Same-LAN check** (local, sends nothing), as for control calls.
+3. **Send** `wake.packets` (1 or 2) UDP datagrams with `SO_BROADCAST` to `(<broadcast>, wake.port)`, where the
+   payload is the standard 102-byte magic packet: `FF` x 6, then the 6 bytes of `tv.mac` x 16 (no SecureOn
+   password).
+
+`<broadcast>` is derived, never configured: the broadcast address of `tv.ip`/`lan_prefix`. Config load rejects
+wake unless that network lies inside 10/8, 172.16/12 or 192.168/16, and rejects a `tv.ip` that is itself the
+network or broadcast address. `wake.port` must be 7 or 9 (default 9); `wake.packets` 1 or 2 (default 1); any other
+key in `wake` (a target host, MAC or URL) is rejected. The MAC is `tv.mac`, already validated as unicast, not
+all-zero and not broadcast.
+
+No key is read, no request goes to 8001 or 4190, and nothing is read back, so the result can only say the packet
+was requested. Whether the TV wakes depends on its network power-on setting (for example Network Standby / Power
+On with Mobile), on Wi-Fi versus Ethernet support, and on it being plugged in. Confirmation is a later
+`tv_status`, which runs the full identity check. Not yet verified on hardware.
 
 ## Status whitelist
 
@@ -154,12 +180,14 @@ A wrong configured MAC (edit the config temporarily) must make every tool fail w
   "lan_prefix": 24,
   "capture_dir": "/absolute/path/to/private/captures",
   "allowed_apps": ["quiet.iptv", "org.tizen.netflix-app"],
-  "capture_max_age_s": 120
+  "capture_max_age_s": 120,
+  "wake": {"enabled": true, "port": 9, "packets": 1}
 }
 ```
 
 All of `schema`, `profile`, `tv.*` and `control_key_file` are mandatory and have no defaults; unknown keys are
-rejected. Location: `--config`, else `QUIETTV_MCP_CONFIG`, else `%APPDATA%\QuietTV-MCP\config.json` (Windows) or
+rejected. `wake` is optional; absent or `"enabled": false` means Wake-on-LAN is off, and configs written before
+it existed load unchanged. Location: `--config`, else `QUIETTV_MCP_CONFIG`, else `%APPDATA%\QuietTV-MCP\config.json` (Windows) or
 `$XDG_CONFIG_HOME/quiettv-mcp/config.json`. The key itself is never in the config, the command line or the
 environment.
 
@@ -186,9 +214,11 @@ model or firmware is rejected at config load and again at every call.
 | `tv_home` | no | no | no | none |
 | `tv_remote_key` | no | no | no | `key`: enum of the 9 names |
 | `tv_launch_app` | no | no | no | `app_id`: enum of the 17 IDs |
+| `tv_wake` † | no | no | yes | none |
 | `maintenance_plan` * | yes | no | yes | `operation`: backup/cleanup/restore, `capsule_ref`: identifier |
 | `maintenance_apply` * | no | **yes** | no | `operation`, `plan_id`, `capsule_ref` |
 
 \* Registered only when the owner starts `quiettv-mcp serve --enable-maintenance`; they work only through a
-validated toolkit adapter (see `TOOLKIT-ADAPTER.md`). Annotations are hints to clients, not enforcement; the
+validated toolkit adapter (see `TOOLKIT-ADAPTER.md`). † Registered only when the owner config enables `wake`.
+Annotations are hints to clients, not enforcement; the
 enforcement is the allowlists and checks above.

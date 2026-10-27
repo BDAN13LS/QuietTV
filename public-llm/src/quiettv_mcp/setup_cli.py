@@ -8,7 +8,9 @@ from __future__ import annotations
 import getpass
 import json
 import os
+import shlex
 import stat
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable, TextIO
@@ -19,7 +21,7 @@ from .profiles import PROFILES
 
 InputFn = Callable[[str], str]
 SERVER_NAME = "quiettv"
-CLIENTS = ("claude-desktop", "codex", "opencode")
+CLIENTS = ("claude-desktop", "claude-code", "codex", "opencode")
 
 
 def _write_private(path: Path, data: bytes, *, overwrite: bool) -> None:
@@ -96,7 +98,14 @@ def run_setup(config_path: Path, *, input_fn: InputFn = input, secret_fn: InputF
     }
     if captures:
         data["capture_dir"] = str(Path(captures).expanduser())
+    if input_fn("Enable optional Wake-on-LAN for this TV (sends a magic packet to its MAC on your LAN broadcast)? "
+                "[y/N] ").strip().lower() == "y":
+        data["wake"] = {"enabled": True, "port": 9, "packets": 1}
     config = validate_config(data)
+    if config.wake is not None:
+        print(f"  Wake packets go to {config.wake.broadcast} port {config.wake.port} (from the TV IP and a /"
+              f"{config.lan_prefix} LAN). The TV must allow network power-on, e.g. Network Standby or Power On "
+              "with Mobile.", file=out)
     _write_private(config_path, (json.dumps(data, indent=2) + "\n").encode("utf-8"), overwrite=True)
     print(f"Saved {config_path}.", file=out)
     print("Next: `quiettv-mcp doctor` then `quiettv-mcp client-config --client all`.", file=out)
@@ -126,6 +135,11 @@ def run_doctor(config_path: Path, *, online: bool = False, out: TextIO = sys.std
         report(False, "config", str(exc))
         return 1
     report(True, "config", f"profile {config.profile.profile_id}")
+    if config.wake is None:
+        report(None, "wake", "off (optional; add a \"wake\" section to enable Wake-on-LAN)")
+    else:
+        report(True, "wake", f"enabled: {config.wake.packets} packet(s) to {config.wake.broadcast} port "
+                             f"{config.wake.port} for the configured MAC (doctor sends none)")
     tv = device_factory(config)
     try:
         tv.read_key()
@@ -174,29 +188,38 @@ def server_command(config_path: Path) -> tuple[str, list[str]]:
     return sys.executable, ["-m", "quiettv_mcp", "serve", "--config", str(config_path)]
 
 
+def _command_line(argv: list[str]) -> str:
+    return subprocess.list2cmdline(argv) if sys.platform == "win32" else shlex.join(argv)
+
+
 def client_fragments(config_path: Path, command: tuple[str, list[str]] | None = None) -> dict[str, str]:
     exe, args = command or server_command(config_path)
     claude = {"mcpServers": {SERVER_NAME: {"command": exe, "args": args}}}
+    # Claude Code registers servers with its own CLI (`claude mcp add`, checked against its --help 2026-10-27).
+    claude_code = _command_line(["claude", "mcp", "add", "--transport", "stdio", "--scope", "user", SERVER_NAME,
+                                 "--", exe, *args])
     toml_args = ", ".join(json.dumps(a) for a in args)
     codex = f"[mcp_servers.{SERVER_NAME}]\ncommand = {json.dumps(exe)}\nargs = [{toml_args}]\n"
     opencode = {"$schema": "https://opencode.ai/config.json",
                 "mcp": {SERVER_NAME: {"type": "local", "command": [exe, *args], "enabled": True}}}
     return {
         "claude-desktop": json.dumps(claude, indent=2) + "\n",
+        "claude-code": claude_code + "\n",
         "codex": codex,
         "opencode": json.dumps(opencode, indent=2) + "\n",
     }
 
 
-FRAGMENT_FILES = {"claude-desktop": "claude_desktop.mcp-fragment.json", "codex": "codex.mcp-fragment.toml",
-                  "opencode": "opencode.mcp-fragment.json"}
+FRAGMENT_FILES = {"claude-desktop": "claude_desktop.mcp-fragment.json", "claude-code": "claude_code.mcp-command.txt",
+                  "codex": "codex.mcp-fragment.toml", "opencode": "opencode.mcp-fragment.json"}
 
 
 def write_client_fragments(config_path: Path, clients: list[str], output_dir: Path | None, out: TextIO) -> list[Path]:
     fragments = client_fragments(config_path)
     if output_dir is None:
         for client in clients:
-            print(f"# {client}: merge this into the client's MCP settings yourself", file=out)
+            how = "run this command yourself" if client == "claude-code" else "merge this into the client's MCP settings yourself"
+            print(f"# {client}: {how}", file=out)
             print(fragments[client], file=out)
         return []
     target_dir = output_dir.expanduser().resolve()

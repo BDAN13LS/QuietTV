@@ -35,6 +35,8 @@ def _parser() -> argparse.ArgumentParser:
     actions.add_parser("status")
     actions.add_parser("home")
     actions.add_parser("diagnostics")
+    actions.add_parser("wake", help="send a Wake-on-LAN packet (only if the owner config enables wake); "
+                                    "confirm with `run status`")
     actions.add_parser("key").add_argument("name", choices=list(KEY_CODES))
     actions.add_parser("launch").add_argument("app_id", choices=list(APP_IDS))
     capture = actions.add_parser("capture")
@@ -74,7 +76,7 @@ def _run(config_path: Path, args: argparse.Namespace, device_factory=None) -> in
             meta["written_to"] = str(out)
             result = meta
         else:
-            calls = {"status": tv.status, "home": tv.home, "diagnostics": tv.diagnostics,
+            calls = {"status": tv.status, "home": tv.home, "diagnostics": tv.diagnostics, "wake": tv.wake,
                      "key": lambda: tv.key(args.name), "launch": lambda: tv.launch(args.app_id)}
             result = calls[args.action]()
     except DeviceError as exc:

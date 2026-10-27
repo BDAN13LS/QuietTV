@@ -4,6 +4,11 @@ Every control call runs, in order: read the key file (local, fail closed) ->
 same-LAN check (local, no packets) -> identity check against 8001/api/v2
 (no key sent) -> one allowlisted request to the 4190 service. A failure at
 any step stops the call before the next one starts.
+
+Wake-on-LAN is the one exception: a TV in standby does not answer 8001, so
+wake() runs only the local same-LAN check and then sends a standard magic
+packet to the owner-configured MAC on the derived LAN broadcast. It uses no
+key, contacts neither port, and never claims the TV woke.
 """
 from __future__ import annotations
 
@@ -30,6 +35,23 @@ KEY_HEADER = "X-QuietTV-Key"
 MAX_JSON_BYTES = 256 * 1024
 MAX_KEY_FILE_BYTES = 4096
 _KEY = re.compile(r"^[\x21-\x7e]{16,256}$")
+WAKE_COOLDOWN_S = 5.0
+WAKE_NOTE = ("Wake packet sent; this does not confirm the TV woke. Wait about 15 seconds, then call tv_status, "
+             "which checks the TV's identity. Wake works only if the TV allows network power-on (for example "
+             "Network Standby / Power On with Mobile) and is plugged in; support over Wi-Fi versus Ethernet varies.")
+
+UdpSender = Callable[[bytes, tuple[str, int]], None]
+
+
+def magic_packet(mac: str) -> bytes:
+    """Standard Wake-on-LAN payload: six 0xFF bytes, then the MAC sixteen times (102 bytes, no password)."""
+    return b"\xff" * 6 + bytes.fromhex(mac.replace(":", "")) * 16
+
+
+def send_udp_broadcast(packet: bytes, address: tuple[str, int]) -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(packet, address)
 
 
 class DeviceError(Exception):
@@ -60,13 +82,15 @@ class Identity:
 
 class QuietTV:
     def __init__(self, config: OwnerConfig, *, identity_port: int = IDENTITY_PORT, control_port: int = CONTROL_PORT,
-                 timeout: float = 10.0, clock: Callable[[], float] = time.time):
+                 timeout: float = 10.0, clock: Callable[[], float] = time.time, udp_sender: UdpSender | None = None):
         self.config = config
         self.identity_port = identity_port
         self.control_port = control_port
         self.timeout = timeout
         self.clock = clock
+        self.udp_sender = udp_sender
         self._seen_capture_ids: set[str] = set()
+        self._last_wake: float | None = None
 
     # -- local checks -------------------------------------------------------
     def read_key(self) -> str:
@@ -228,6 +252,30 @@ class QuietTV:
         saved = self._save_capture(shot)
         meta["saved_to_private_dir"] = saved
         return shot, meta
+
+    def wake(self) -> dict[str, Any]:
+        wake = self.config.wake
+        if wake is None:
+            raise DeviceError("Wake-on-LAN is off: the owner config has no enabled \"wake\" section; nothing sent")
+        now = self.clock()
+        if self._last_wake is not None and 0 <= now - self._last_wake < WAKE_COOLDOWN_S:
+            raise DeviceError(f"a wake was requested less than {WAKE_COOLDOWN_S:g} s ago; nothing sent")
+        self.check_lan()
+        self._last_wake = now
+        packet = magic_packet(self.config.tv_mac)
+        sender = self.udp_sender or send_udp_broadcast
+        sent = 0
+        for _ in range(wake.packets):
+            try:
+                sender(packet, (str(wake.broadcast), wake.port))
+            except OSError as exc:
+                raise DeviceError(f"sending the wake packet failed ({type(exc).__name__}) after {sent} of "
+                                  f"{wake.packets} sent") from None
+            sent += 1
+        # Neither the MAC nor the broadcast address is echoed: results go to a model, and nothing else returns them.
+        return {"requested": True, "packets_sent": sent, "port": wake.port,
+                "target": "owner-configured TV MAC on the tv.ip/lan_prefix broadcast",
+                "awake_verified": False, "identity_checked": False, "note": WAKE_NOTE}
 
     def _save_capture(self, shot: cap.Capture) -> bool:
         directory = self.config.capture_dir

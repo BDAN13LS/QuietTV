@@ -7,7 +7,8 @@ Device-affecting changes therefore need a **maintainer attestation bound to the 
 ## Which changes need it
 
 Anything that changes what is sent to the TV, the identity check, profiles, key or app allowlists, capture
-handling, or maintenance. CODEOWNERS routes those files to the maintainer.
+handling, Wake-on-LAN, or maintenance. Wake-on-LAN (`tv_wake`) is covered offline by a recording sender only; no
+hardware attestation for it exists yet. CODEOWNERS routes those files to the maintainer.
 
 ## How it works
 

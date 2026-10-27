@@ -16,12 +16,27 @@ SCHEMA = "quiettv-mcp-config/1"
 CONFIG_ENV = "QUIETTV_MCP_CONFIG"
 MAX_CONFIG_BYTES = 64 * 1024
 _MAC = re.compile(r"^[0-9A-F]{2}(?::[0-9A-F]{2}){5}$")
-_TOP_KEYS = {"schema", "profile", "tv", "control_key_file", "lan_prefix", "capture_dir", "allowed_apps", "capture_max_age_s"}
+_TOP_KEYS = {"schema", "profile", "tv", "control_key_file", "lan_prefix", "capture_dir", "allowed_apps", "capture_max_age_s",
+             "wake"}
 _TV_KEYS = {"ip", "mac", "model", "firmware"}
+_WAKE_KEYS = {"enabled", "port", "packets"}
+WAKE_PORTS = (7, 9)
+WAKE_MAX_PACKETS = 2
+# RFC 1918 only, written numerically: wake broadcasts never leave a private LAN.
+_RFC1918 = (ipaddress.IPv4Network((0x0A000000, 8)), ipaddress.IPv4Network((0xAC100000, 12)),
+            ipaddress.IPv4Network((0xC0A80000, 16)))
 
 
 class ConfigError(ValueError):
     """The owner configuration is missing or invalid. Messages never carry key material."""
+
+
+@dataclass(frozen=True)
+class WakeConfig:
+    """Owner opt-in Wake-on-LAN. The target MAC is always tv.mac; the broadcast is derived, never typed."""
+    broadcast: ipaddress.IPv4Address
+    port: int = 9
+    packets: int = 1
 
 
 @dataclass(frozen=True)
@@ -34,6 +49,7 @@ class OwnerConfig:
     capture_dir: Path | None = None
     allowed_apps: tuple[str, ...] = field(default_factory=tuple)
     capture_max_age_s: int = 120
+    wake: WakeConfig | None = None
     # Set only by in-process test harnesses; never by a file, flag or environment variable.
     fixture_mode: bool = False
 
@@ -86,6 +102,35 @@ def parse_tv_ip(value: object, *, allow_loopback_fixture: bool = False) -> ipadd
     return ip
 
 
+def parse_wake(value: object, ip: ipaddress.IPv4Address, prefix: int) -> WakeConfig | None:
+    """Validate the optional "wake" section. Absent, or enabled false, means Wake-on-LAN is off."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ConfigError("wake must be an object like {\"enabled\": true, \"port\": 9, \"packets\": 1}")
+    unknown = set(value) - _WAKE_KEYS
+    if unknown:
+        raise ConfigError("unknown wake keys: " + ", ".join(sorted(unknown))
+                          + " (the target is always tv.mac on the tv.ip/lan_prefix broadcast)")
+    enabled = value.get("enabled")
+    if not isinstance(enabled, bool):
+        raise ConfigError("wake.enabled must be true or false")
+    port = value.get("port", 9)
+    if not isinstance(port, int) or isinstance(port, bool) or port not in WAKE_PORTS:
+        raise ConfigError("wake.port must be 7 or 9")
+    packets = value.get("packets", 1)
+    if not isinstance(packets, int) or isinstance(packets, bool) or not 1 <= packets <= WAKE_MAX_PACKETS:
+        raise ConfigError(f"wake.packets must be an integer from 1 to {WAKE_MAX_PACKETS}")
+    if not enabled:
+        return None
+    network = ipaddress.IPv4Network(f"{ip}/{prefix}", strict=False)
+    if not any(network.subnet_of(net) for net in _RFC1918):
+        raise ConfigError("wake needs tv.ip inside an RFC 1918 LAN (10/8, 172.16/12 or 192.168/16)")
+    if ip in (network.network_address, network.broadcast_address):
+        raise ConfigError("tv.ip is the network or broadcast address of tv.ip/lan_prefix; check lan_prefix")
+    return WakeConfig(broadcast=network.broadcast_address, port=port, packets=packets)
+
+
 def _absolute_path(value: object, name: str) -> Path:
     if not isinstance(value, str) or not value.strip():
         raise ConfigError(f"{name} must be an absolute path")
@@ -131,6 +176,7 @@ def validate_config(data: Mapping[str, Any], *, allow_loopback_fixture: bool = F
     max_age = data.get("capture_max_age_s", 120)
     if not isinstance(max_age, int) or isinstance(max_age, bool) or not 5 <= max_age <= 600:
         raise ConfigError("capture_max_age_s must be an integer from 5 to 600")
+    wake = parse_wake(data.get("wake"), ip, prefix)
     return OwnerConfig(
         profile=profile,
         tv_ip=ip,
@@ -140,6 +186,7 @@ def validate_config(data: Mapping[str, Any], *, allow_loopback_fixture: bool = F
         capture_dir=capture_dir,
         allowed_apps=tuple(dict.fromkeys(apps)),
         capture_max_age_s=max_age,
+        wake=wake,
         fixture_mode=bool(allow_loopback_fixture and ip.is_loopback),
     )
 
@@ -178,4 +225,6 @@ def config_to_dict(config: OwnerConfig) -> dict[str, Any]:
     }
     if config.capture_dir is not None:
         data["capture_dir"] = str(config.capture_dir)
+    if config.wake is not None:
+        data["wake"] = {"enabled": True, "port": config.wake.port, "packets": config.wake.packets}
     return data

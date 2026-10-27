@@ -27,6 +27,16 @@ def config_dict(key_file: Path, *, ip: str = "127.0.0.1", **extra) -> dict:
     return data
 
 
+@pytest.fixture(autouse=True)
+def no_real_wake_broadcast(monkeypatch):
+    """No test may put a Wake-on-LAN packet on a real network: the default sender fails the test instead."""
+    import quiettv_mcp.device as device_module
+
+    def refuse(packet, address):
+        raise AssertionError("a test reached the real UDP broadcast sender")
+    monkeypatch.setattr(device_module, "send_udp_broadcast", refuse)
+
+
 @pytest.fixture
 def key() -> str:
     return "fixture-" + secrets.token_hex(20)

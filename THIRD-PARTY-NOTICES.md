@@ -10,8 +10,9 @@ The upstream repository declares the
 The adaptation consumes Home and forwards other key events; it is not a
 kernel patch. The portable native source candidate is included under
 `launcher/host/`; the original deployed tree and installation services are
-not included. This attribution does not select a repository-wide licence
-for QuietTV.
+not included. This attribution does not change the Unlicense terms of the upstream
+code. QuietTV's original code is licensed under MIT; see the root `LICENSE`.
+That grant does not relicense anything listed in this file.
 
 ## Frontend runtime packages
 
