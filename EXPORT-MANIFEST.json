@@ -13,13 +13,13 @@
     },
     {
       "path": "README.md",
-      "size": 7498,
-      "sha256": "0be869e841e99ffeeb1b89d1100799718bd914e5e2518805ec5f7d710eb6a34a"
+      "size": 7648,
+      "sha256": "cfa70ea255c84264496ff42e809fb391590c946de2bf1917af644f9921d84ab2"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
-      "size": 19126,
-      "sha256": "08845637d52d132960bba0c8ad09f94007ec21f5acbc8f172f1331896d3fd6a6"
+      "size": 19508,
+      "sha256": "54e5ca2507d28e0b3ba4ac17e64acbfb0a501ff28d27c317ac7fc1df44bdd1df"
     },
     {
       "path": ".github/CODEOWNERS",
@@ -88,8 +88,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 3494,
-      "sha256": "4f6f0fc0bd13a2bd8306c0d428f936a92b20af493f0450414ba526031f007c9f"
+      "size": 3570,
+      "sha256": "6d3402e1af9c182110c0a5ddda5b4f420271f15a188da1111a5c2866cfdf3ee2"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -98,8 +98,8 @@
     },
     {
       "path": "public-toolkit/README.md",
-      "size": 14597,
-      "sha256": "f6b90b4fb6bcdd8ebe8014fa0e86c87558a183bc4ebc9babc50848bf20dbb283"
+      "size": 14854,
+      "sha256": "055c42122f8e67e8f0a977ba358630732289fe51cfeac689391f98fe42a88cae"
     },
     {
       "path": "public-toolkit/Setup.ps1",
@@ -228,8 +228,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 3079,
-      "sha256": "6b47f42549745531adcb83914ff849c1db75d76aa687f4aacb553108e8cc894c"
+      "size": 3156,
+      "sha256": "18236242ba75e20c7b7b10654781bcbd9b0e9d86933cc9cdc620354cdd73df27"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -638,8 +638,8 @@
     },
     {
       "path": "public-toolkit/tvkit/assemble.py",
-      "size": 5506,
-      "sha256": "5fd18aee84ed97fe08a268ab0414d78c4c47d7c7ed767cc412f17ff132a08f74"
+      "size": 5633,
+      "sha256": "f8fa0158903858aa856bb7a7f9f98369e29cd28e2e249cc13c9e46aef19ab426"
     },
     {
       "path": "public-toolkit/tvkit/audit.py",
@@ -653,8 +653,8 @@
     },
     {
       "path": "public-toolkit/tvkit/capsule.py",
-      "size": 34262,
-      "sha256": "bbbc3a602b6878fa308dda683d6a87d45c3330ce0fe6d0c997fc92ee6eb018d4"
+      "size": 35056,
+      "sha256": "76a2fc97048e0f229fc26587f80b20e3d95077adc5c8a8cfb7cb401d35c9078d"
     },
     {
       "path": "public-toolkit/tvkit/catalogue.py",
@@ -663,8 +663,8 @@
     },
     {
       "path": "public-toolkit/tvkit/cli.py",
-      "size": 14210,
-      "sha256": "b01e78ec68699cedc4d4631aec493a847cc303304e89a0e621a185d67fb1d74d"
+      "size": 14533,
+      "sha256": "4008ba398587417dd93f92dc505e7212230ab99d6cc9d87e9bf4d448bf24c677"
     },
     {
       "path": "public-toolkit/tvkit/config.py",
@@ -708,8 +708,8 @@
     },
     {
       "path": "public-toolkit/tvkit/profile.py",
-      "size": 7958,
-      "sha256": "d67ff62d09f4e631c91bbc4aede058a54a333944bd0fb0c7954875b89a20a443"
+      "size": 8153,
+      "sha256": "156572fa24325a742280c2b4dd37eadf533a7b47e798b2ea60b62aac71366fd0"
     },
     {
       "path": "public-toolkit/tvkit/states.py",
