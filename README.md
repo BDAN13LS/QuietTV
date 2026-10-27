@@ -23,21 +23,26 @@ TV.*
 
 | TV model | Firmware | Status |
 |---|---|---|
-| Samsung UN43U8000FBXZA (ARMv7, Tizen 9) | 1300.8 | Developer preview, one TV tested |
+| Samsung UN43U8000FBXZA (ARMv7, Tizen 9) | 1300.8 | Verified on the test TV; public setup tools in development |
 | Anything else | — | **Not supported.** QuietTV refuses other models and firmware. |
 
-## Current status: developer preview
+## Current status: verified on the test TV; public setup tools in development
 
-- **Not ready for consumers yet.** There is no installer you can download
-  today.
-- On the one test TV: the launcher (2.0.18) is installed and
-  opens native apps, the input picker, picture and sound settings, and the
-  Store. Three optional payloads have been removed there: Guide, the
-  informational Security Center screen, and TV Plus.
+- **The launcher works on the test TV.** On the Samsung UN43U8000FBXZA
+  (Tizen 9, ARMv7, firmware 1300.8) the launcher (2.0.18) is installed. Home,
+  the remote, native app launch, picture and sound settings, Settings, the
+  input picker and opening the Store all passed, as did unattended root
+  recovery.
+- **No consumer self-installer yet.** There is no installer you can download
+  today, and no live public restore writer. What is public so far is source
+  and offline-tested building blocks (see the roadmap below).
+- **Removed on the test TV:** a set of optional Samsung payloads, listed in
+  [docs/CLEANUP-STATUS.md](docs/CLEANUP-STATUS.md) with what was kept and
+  what was held back.
 - **Not verified yet:** Store app updates actually installing, DRM playback
-  and HDMI video. IPTV picture is currently black, so IPTV will be
-  hidden or marked unavailable until fixed. A black gap at startup is
-  still unsolved. Memory savings have not been measured, and removing all
+  and physical HDMI video. IPTV picture is currently black, so IPTV will be
+  hidden or marked unavailable until fixed. A black gap on cold boot is still
+  unsolved. Memory (RAM) savings have not been measured, and removing all
   Samsung tracking has not been proven.
 
 ## How installing will work (planned, not available yet)
@@ -157,6 +162,9 @@ install, cleanup and restore remain unavailable. The separate
 TV and correctly detects leftover registry entries. It exits after each read.
 Neither is a consumer Windows installer or a live backup/restore connection yet.
 
+What was removed on the test TV, and what was deliberately kept or held, is in
+[docs/CLEANUP-STATUS.md](docs/CLEANUP-STATUS.md).
+
 ## Contributing
 
 Fork, open a pull request, let the offline checks run, and wait for review.
@@ -165,7 +173,7 @@ Hardware claims need evidence at the exact commit. See
 
 ## Licence
 
-No repository-wide licence has been chosen yet. Component licences are in
+No repository-wide licence has been chosen yet; the owner is deciding. Component licences are in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## For developers using AI assistants (optional)
