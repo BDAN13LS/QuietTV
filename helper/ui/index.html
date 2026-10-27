@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>QuietTV Helper</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="side">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <div class="brand-name">QuietTV Helper</div>
+          <div class="brand-sub">Developer preview</div>
+        </div>
+      </div>
+      <nav aria-label="Steps">
+        <ol class="steps" id="nav">
+          <li><button type="button" class="nav-item" data-screen="check" aria-current="page"><span class="num">1</span>Check TV</button></li>
+          <li><button type="button" class="nav-item" data-screen="backup"><span class="num">2</span>Back up</button></li>
+          <li><button type="button" class="nav-item" data-screen="launcher"><span class="num">3</span>Launcher</button></li>
+          <li><button type="button" class="nav-item" data-screen="cleanup"><span class="num">4</span>Cleanup</button></li>
+          <li><button type="button" class="nav-item" data-screen="restore"><span class="num">5</span>Restore</button></li>
+          <li><button type="button" class="nav-item" data-screen="report"><span class="num">6</span>Report</button></li>
+        </ol>
+      </nav>
+      <p class="side-note">This preview only reads your TV's public information page. It never installs, removes or restores anything.</p>
+    </aside>
+
+    <main id="main" tabindex="-1">
+      <div class="banner" id="session-banner" role="alert" hidden>
+        This page needs the private link QuietTV Helper opens for you. Close this tab and start QuietTV Helper again.
+      </div>
+
+      <section class="screen" id="screen-check" aria-labelledby="h-check">
+        <h1 id="h-check">Check your TV</h1>
+        <p class="lead">QuietTV reads the information page your Samsung TV shares on your home network. Nothing on the TV is changed.</p>
+
+        <div class="card">
+          <form id="check-form" novalidate>
+            <label for="tv-ip">TV address</label>
+            <p class="hint" id="tv-ip-hint">On the TV: Settings, General, Network, Network Status, IP Settings. It is four numbers separated by dots, usually starting 192.168 or 10.</p>
+            <div class="row">
+              <input id="tv-ip" name="tv-ip" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"
+                     maxlength="15" placeholder="TV IP address" aria-describedby="tv-ip-hint form-msg">
+              <button type="submit" class="primary" id="check-btn">Check TV</button>
+              <button type="button" id="cancel-btn" hidden>Cancel</button>
+            </div>
+            <p class="msg" id="form-msg" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+
+        <div class="card" id="result-card" hidden>
+          <h2>What QuietTV found</h2>
+          <dl class="facts" id="facts"></dl>
+          <div id="missing-wrap" hidden>
+            <h3>Not confirmed by this check</h3>
+            <ul class="missing" id="missing"></ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Before you start</h2>
+          <ul class="plain" id="prereqs"></ul>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-backup" aria-labelledby="h-backup" hidden></section>
+      <section class="screen" id="screen-launcher" aria-labelledby="h-launcher" hidden></section>
+      <section class="screen" id="screen-cleanup" aria-labelledby="h-cleanup" hidden></section>
+      <section class="screen" id="screen-restore" aria-labelledby="h-restore" hidden></section>
+
+      <section class="screen" id="screen-report" aria-labelledby="h-report" hidden>
+        <h1 id="h-report">Report</h1>
+        <p class="lead">A plain summary of this session. It stays on this PC unless you copy it somewhere.</p>
+        <div class="card">
+          <pre class="report" id="report-text" tabindex="0" aria-label="Session report"></pre>
+          <div class="row">
+            <button type="button" id="copy-btn">Copy report</button>
+            <span class="msg" id="copy-msg" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

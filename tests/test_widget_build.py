@@ -253,6 +253,8 @@ WIDGET_EXPORT_FILES = ("helper/owner_init.py", "helper/build_widget.py", "launch
                        "launcher/widget/tv-inputs.js", "tests/test_owner_init.py", "tests/test_widget_build.py",
                        "tests/test_widget_bridge.py")
 OWNED_SUITES = ("test_owner_init.py", "test_widget_build.py", "test_widget_bridge.py")
+HELPER_UI_SOURCE_FILES = ("helper/server.py", "helper/session.py", "helper/README.md",
+                          "helper/ui/index.html", "helper/ui/app.js", "helper/ui/style.css")
 
 
 class ExportSmokeTests(unittest.TestCase):
@@ -280,12 +282,12 @@ class ExportSmokeTests(unittest.TestCase):
         allow = self.ex.load_allowlist(REPO / "public-toolkit" / "export-allowlist.json")
         self.assertEqual(sorted(e for e in allow.include if e.startswith(("helper/", "launcher/widget/")))
                          + sorted(e for e in allow.include if e.startswith(("tests/test_owner", "tests/test_widget"))),
-                         sorted(WIDGET_EXPORT_FILES[:6]) + sorted(WIDGET_EXPORT_FILES[6:]))
+                         sorted(WIDGET_EXPORT_FILES[:6] + HELPER_UI_SOURCE_FILES) + sorted(WIDGET_EXPORT_FILES[6:]))
         report = self.ex.build_report(REPO, allow)
         self.assertEqual([(v.path, v.rule) for v in report.violations], [])
         shipped = {p for p, _, _ in report.files}
         self.assertEqual(sorted(p for p in shipped if p.startswith(("helper/", "launcher/widget/"))),
-                         sorted(WIDGET_EXPORT_FILES[:6]))  # nothing else from helper/ (e.g. helper/d0)
+                         sorted(WIDGET_EXPORT_FILES[:6] + HELPER_UI_SOURCE_FILES))  # no other helper files (e.g. helper/d0)
         with tempfile.TemporaryDirectory() as tmp:  # fresh folder outside the checkout, no deny/owner inputs
             out = Path(tmp) / "export"
             self.ex.write_export(REPO, report, out)

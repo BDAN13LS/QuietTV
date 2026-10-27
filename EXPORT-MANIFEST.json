@@ -13,8 +13,8 @@
     },
     {
       "path": "README.md",
-      "size": 8776,
-      "sha256": "548e8c75bfd8e240a7352a445565c929ad152a0af9501d644a21e0cb3ad62aef"
+      "size": 9237,
+      "sha256": "99e16008dcccb02ad042070eafa792fd63b8adbe10aaef0608fe4cf3a5b2c34c"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
@@ -72,6 +72,21 @@
       "sha256": "4ffcf5ce244a52001040ea2bee3c1f14664700201f18d6462c1828a730515ac3"
     },
     {
+      "path": "helper/README.md",
+      "size": 5212,
+      "sha256": "fb7f253a5824aa36872cbbcdd6fd99d7b6e19257b7d79de29c925dd40de4c430"
+    },
+    {
+      "path": "helper/server.py",
+      "size": 15282,
+      "sha256": "3b6982e6f0cf7200a2ad711ec4b522df0ec4d716d408a2ed9e0d85db432a8eb7"
+    },
+    {
+      "path": "helper/session.py",
+      "size": 28083,
+      "sha256": "16a7270da154093a7c29a60207c801c0418c2831472cfcc17fceb1b925b66640"
+    },
+    {
       "path": "public-llm/.gitignore",
       "size": 188,
       "sha256": "cb835d1eb124d8d417e8ebb841a9785ac2e4637e71ad948c891cd0aff4976c61"
@@ -98,8 +113,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 5121,
-      "sha256": "e91314a271ba51b611c3fb7e07d96c98feee56d7b1140097bdcefa6426925a6c"
+      "size": 5759,
+      "sha256": "5e6acba354aa849cf89e5e0603d4df6b1626cfa77422bc7e60ea8a1e8c95aaab"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -135,6 +150,21 @@
       "path": "rescue/__init__.py",
       "size": 101,
       "sha256": "1b33e00bd36b26d2fdde1457577f29c18609409be9536789ef4f77422dfa8e02"
+    },
+    {
+      "path": "tests/test_helper_server.py",
+      "size": 19553,
+      "sha256": "d51593d241d84e4f6716756106dd0e6c46534e34b5424346a631409f71b380a9"
+    },
+    {
+      "path": "tests/test_helper_session.py",
+      "size": 28305,
+      "sha256": "42f34b3a3477cf75a667b0e96f3abbc57be71bcf64879af4d47f0d4fdc65024b"
+    },
+    {
+      "path": "tests/test_helper_ui.mjs",
+      "size": 12580,
+      "sha256": "b7054c30a49f7b10b80e1e88a165a6154c1137a1c9a72b55bbac0afe5602252a"
     },
     {
       "path": "tests/test_optional_app_plan.py",
@@ -232,14 +262,19 @@
       "sha256": "bd41ab0d5b338a193248f3b66dc20cdc692fb7a5713dc225b724cbfbaf3ac7d7"
     },
     {
+      "path": "tests/test_tv_inspector.py",
+      "size": 65510,
+      "sha256": "341f167ae3ab5aa3575d0a2b760c81b9df4421989f6ba13764e20e511420f4c9"
+    },
+    {
       "path": "tests/test_widget_bridge.py",
       "size": 16271,
       "sha256": "e6065a0107b8efc723d256f0e77f5c560dba7a64c7ba89bbfb079e02eaf69b32"
     },
     {
       "path": "tests/test_widget_build.py",
-      "size": 16922,
-      "sha256": "f6325e7ec17dd48868f939dd4ef819c25565a77074ffc8cdc7f307cbaede393f"
+      "size": 17150,
+      "sha256": "0ad2a9ba4e9837c4103574d63b6868a736b15d200534037cc2725eb0095ef497"
     },
     {
       "path": "tools/build-public-host.ps1",
@@ -268,8 +303,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 4244,
-      "sha256": "159e969b8729af3aea3e818df99909b82e53c2442e9c7af63f819c9a19f715f0"
+      "size": 4595,
+      "sha256": "7390eb3c07ec6d1a074490b190fc737de9939e6f104c3f897a6661d768342814"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -445,6 +480,21 @@
       "path": "frontend/src/assets/iptv.svg",
       "size": 645,
       "sha256": "55614c112c0e9b96c5f01de3dfc577a4a1ca298db564653430c53ef7827aaa12"
+    },
+    {
+      "path": "helper/ui/app.js",
+      "size": 11490,
+      "sha256": "937f1f482e133ceef9db0c8fb074ac570202533d542020bb7eb05990f987fbb5"
+    },
+    {
+      "path": "helper/ui/index.html",
+      "size": 4546,
+      "sha256": "5119091e9c0038cdad2f8314cb769ba8e8f0e63a7f486cade3b313c93de56e63"
+    },
+    {
+      "path": "helper/ui/style.css",
+      "size": 4800,
+      "sha256": "f9413c3bffbede2e203d16bba7bc901b5f1bf2c7aff5feb12a7cdf5900c8b64b"
     },
     {
       "path": "launcher/host/.gitignore",
@@ -920,6 +970,51 @@
       "path": "tests/fixtures/recovery2/external-policy.json",
       "size": 493,
       "sha256": "7507933693a550966242de063ec302173dcba5917ef5956c076cda35235efad6"
+    },
+    {
+      "path": "tools/tv-inspect/.gitignore",
+      "size": 77,
+      "sha256": "a0239ac14d5b491838c2504f73a5607f309b04bc5dd20fa80410ee1c54de3615"
+    },
+    {
+      "path": "tools/tv-inspect/frame.py",
+      "size": 10031,
+      "sha256": "2efa3ae926f074aa8d7f38f99dc7f925f0910a1feaffdf41b34422bc8a01c172"
+    },
+    {
+      "path": "tools/tv-inspect/global.json",
+      "size": 111,
+      "sha256": "1a6a5752d7f49bf92c636333fdaa5c243c30220f63bad02a9c17428fd4009637"
+    },
+    {
+      "path": "tools/tv-inspect/Inspector.cs",
+      "size": 39459,
+      "sha256": "d0e799c6cd5f52ec828d5ef4ea8ff3403532548c371366a76fec67f53a631c3d"
+    },
+    {
+      "path": "tools/tv-inspect/NuGet.Config",
+      "size": 217,
+      "sha256": "5f4a2982fabb9995bbe497644a961b97264688470654f5f71ec5ea112b40acd3"
+    },
+    {
+      "path": "tools/tv-inspect/Program.cs",
+      "size": 9429,
+      "sha256": "bf893e082ef2095340433864a51d5540f9fd3d3024de01247ae56500ca77a30f"
+    },
+    {
+      "path": "tools/tv-inspect/QuietTVInspect.csproj",
+      "size": 1376,
+      "sha256": "2501e14aa143305c41e9d237ccaf9c96d9aceb83474401dcb4846c418a4bb2be"
+    },
+    {
+      "path": "tools/tv-inspect/README.md",
+      "size": 12176,
+      "sha256": "4e9a8d5bd53cb4557af7834dc01781348a75a3a1744734d895a1b23bdbbfe216"
+    },
+    {
+      "path": "tools/tv-inspect/SelfTests.cs",
+      "size": 54223,
+      "sha256": "d65f0e38a535acd47eea836800a820f134c692524e49cafe377693e8a6d69ebd"
     },
     {
       "path": "tools/xattr-backup/Program.cs",

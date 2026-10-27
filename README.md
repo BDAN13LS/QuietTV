@@ -150,6 +150,13 @@ fields. Its offline undo planner refuses changed values rather than
 overwriting them. There is still no live recovery/2 writer or complete
 consumer installer.
 
+The [local Helper preview](helper/README.md) now has a working **Check TV**
+page. It recognises the test TV and reports the missing compatibility checks;
+install, cleanup and restore remain unavailable. The separate
+[read-only inventory tool](tools/tv-inspect/README.md) was warm-tested on the
+TV and correctly detects leftover registry entries. It exits after each read.
+Neither is a consumer Windows installer or a live backup/restore connection yet.
+
 ## Contributing
 
 Fork, open a pull request, let the offline checks run, and wait for review.

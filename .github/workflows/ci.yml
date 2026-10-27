@@ -58,6 +58,9 @@ jobs:
         run: |
           .venv/bin/python -m unittest discover -s tests -p 'test_owner_init.py' -q
           .venv/bin/python -m unittest discover -s tests -p 'test_widget*.py' -q
+          .venv/bin/python -m unittest discover -s tests -p 'test_helper*.py' -q
+          node --test tests/test_helper_ui.mjs
+          .venv/bin/python -m unittest discover -s tests -p 'test_tv_inspector.py' -q
 
   native-host:
     name: Native host build
@@ -79,6 +82,8 @@ jobs:
           dotnet --list-sdks
           $env:QUIETTV_DOTNET = (Get-Command dotnet).Source
           python -m unittest discover -s tests -p test_public_host_source.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s tests -p test_tv_inspector.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   public-source-guard:
