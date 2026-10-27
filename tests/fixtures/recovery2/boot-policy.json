@@ -1,0 +1,9 @@
+{
+  "schema": "tvkit-boot-field-policy/1",
+  "profileId": "SYNTHETIC-QTV0001-0000.1-armv7l-tizen9",
+  "fields": [
+    {"target": "bootcache-record:org.example.delta", "field": "autostart", "values": ["true", "false"]},
+    {"target": "bootcache-record:org.example.delta", "field": "priority", "values": ["normal", "low"]},
+    {"target": "service:org.example.echo-daemon", "field": "enabled", "values": ["1", "0"]}
+  ]
+}

@@ -13,8 +13,8 @@
     },
     {
       "path": "README.md",
-      "size": 7847,
-      "sha256": "236f4e8f34a0bba799c072366e9ff206eff3c0f573d859b9b643df51854d9d90"
+      "size": 8776,
+      "sha256": "548e8c75bfd8e240a7352a445565c929ad152a0af9501d644a21e0cb3ad62aef"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
@@ -62,6 +62,16 @@
       "sha256": "3712f7e80ea1c85e0d3dc6770335ff4e6a7c469b2b03dbe017b13f39da251467"
     },
     {
+      "path": "helper/build_widget.py",
+      "size": 13431,
+      "sha256": "56001cd40e8b0bacb97dc4f57d9decb7d5c7edf4a3a8864f045b6c4cee9ac5ef"
+    },
+    {
+      "path": "helper/owner_init.py",
+      "size": 25848,
+      "sha256": "4ffcf5ce244a52001040ea2bee3c1f14664700201f18d6462c1828a730515ac3"
+    },
+    {
       "path": "public-llm/.gitignore",
       "size": 188,
       "sha256": "cb835d1eb124d8d417e8ebb841a9785ac2e4637e71ad948c891cd0aff4976c61"
@@ -88,13 +98,13 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 4341,
-      "sha256": "fc1ff2ed95ea5ca56c3e6ae81eb0b19736ddbaa75deb71dcb1eebd4d62d2ff81"
+      "size": 5121,
+      "sha256": "e91314a271ba51b611c3fb7e07d96c98feee56d7b1140097bdcefa6426925a6c"
     },
     {
       "path": "public-toolkit/frontend-export.json",
-      "size": 4003,
-      "sha256": "57e262ab0c1da04c881ece8de693a95a21fccb50e296dc9122138ecb3f9904fa"
+      "size": 4585,
+      "sha256": "e954d55d1875dd96dde23db5d601d0ba1b8fd9b82284ea3ad5f3c148499fc353"
     },
     {
       "path": "public-toolkit/README.md",
@@ -130,6 +140,11 @@
       "path": "tests/test_optional_app_plan.py",
       "size": 21215,
       "sha256": "f41dd9c1eeb6940b50b941bc7385a8edc69f4c9d431e671490f99961bc6fbf73"
+    },
+    {
+      "path": "tests/test_owner_init.py",
+      "size": 16030,
+      "sha256": "1b3e54634453b0ee634c57c76229269648116843765c1116642e2626d59f0788"
     },
     {
       "path": "tests/test_public_host_source.py",
@@ -192,14 +207,19 @@
       "sha256": "d0a352695efca6195a9bf7dccea1e8e5bf08407f6af2a212f8a5c2502d1f86b3"
     },
     {
+      "path": "tests/test_public_toolkit_recovery2.py",
+      "size": 33956,
+      "sha256": "2fc7a7f682c235a7b25ab11b56a8f7420ad7df7cb22503b9ec5d7a77198b876f"
+    },
+    {
       "path": "tests/test_public_toolkit_states.py",
       "size": 3495,
       "sha256": "9ac4b8a67c596dc6a52ce297eb1ade7d6bf20f922c189f155dc0ef7dce0e20c9"
     },
     {
       "path": "tests/test_public_toolkit_v2_integration.py",
-      "size": 15860,
-      "sha256": "2de21dcba65bf14fefa626bce989123ff63908c8eba272d92a5495b58e901d98"
+      "size": 18157,
+      "sha256": "5fa8e1109e3782d1f630cbc600d39fec61878422ad9b5c11ef29ec2d9676b2d5"
     },
     {
       "path": "tests/test_rescue_independence.py",
@@ -210,6 +230,16 @@
       "path": "tests/test_rescue_refusals.py",
       "size": 27076,
       "sha256": "bd41ab0d5b338a193248f3b66dc20cdc692fb7a5713dc225b724cbfbaf3ac7d7"
+    },
+    {
+      "path": "tests/test_widget_bridge.py",
+      "size": 16271,
+      "sha256": "e6065a0107b8efc723d256f0e77f5c560dba7a64c7ba89bbfb079e02eaf69b32"
+    },
+    {
+      "path": "tests/test_widget_build.py",
+      "size": 16922,
+      "sha256": "f6325e7ec17dd48868f939dd4ef819c25565a77074ffc8cdc7f307cbaede393f"
     },
     {
       "path": "tools/build-public-host.ps1",
@@ -238,8 +268,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 3999,
-      "sha256": "7584f2332fb72f80ccb3f1bac638935ffcc6edda45d7cfc0b8de521e85c95182"
+      "size": 4244,
+      "sha256": "159e969b8729af3aea3e818df99909b82e53c2442e9c7af63f819c9a19f715f0"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -268,8 +298,8 @@
     },
     {
       "path": "frontend/src/boot-ready.mjs",
-      "size": 4660,
-      "sha256": "93a025f9abcee2d59bdd716413026ef88e4f498bc01a3e38eaf84fa7fd8bc813"
+      "size": 4999,
+      "sha256": "0d6738f57bfef88d1c24faba1f961359ea518ecf3a863fc8f0717c7444ca7756"
     },
     {
       "path": "frontend/src/catalog-policy.mjs",
@@ -288,13 +318,18 @@
     },
     {
       "path": "frontend/src/main.jsx",
-      "size": 27735,
-      "sha256": "8dc182684a57b90849416330f780203946f766ac70225a457ab779d8f0ef65a7"
+      "size": 28351,
+      "sha256": "f89bac4b9250f6a31336b9cd8400e231a3fc1bb0b70f69528513b43aa3bdf815"
     },
     {
       "path": "frontend/src/policy.mjs",
       "size": 1909,
       "sha256": "953612ea23db7b72dfd7cf286533d503537a5582785aeb08c22d73437402acff"
+    },
+    {
+      "path": "frontend/src/runtime-catalog.mjs",
+      "size": 2973,
+      "sha256": "bebb9697dc76face26158aff58242e48ee2e3aabd2549d5f190456ea8f4065fa"
     },
     {
       "path": "frontend/src/style.css",
@@ -318,8 +353,8 @@
     },
     {
       "path": "frontend/tests/boot-ready.test.mjs",
-      "size": 8759,
-      "sha256": "4b33d6252347cf727545dc6c46d03bb61a7d969b61184b2207dabfdff5dee079"
+      "size": 10419,
+      "sha256": "696efdd5723c85feee6fe34ef46b7dd0496beb5e58dc205b30e19c613ff04df7"
     },
     {
       "path": "frontend/tests/browser-cua-checks.js",
@@ -333,13 +368,18 @@
     },
     {
       "path": "frontend/tests/launcher-apps.test.mjs",
-      "size": 5390,
-      "sha256": "87c388ba6b31fd4762c1e0491bd43bd35938c969945eb76c81e5e80d1482da3c"
+      "size": 5441,
+      "sha256": "b47603ed279911caf509c1731356b256d3ee023f5546cc88e65d0ff84d97811a"
     },
     {
       "path": "frontend/tests/policy.test.mjs",
       "size": 3239,
       "sha256": "2938d73dc6700b29efff0425dc059a41e30691daeed3101befe635392e98408b"
+    },
+    {
+      "path": "frontend/tests/runtime-catalog.test.mjs",
+      "size": 4837,
+      "sha256": "4b1d536929d84e9916ab39d9dd2e6c315645bda4f561bc49fe965554358a9fe8"
     },
     {
       "path": "frontend/tests/visual-polish.test.mjs",
@@ -490,6 +530,26 @@
       "path": "launcher/host/WebFrontend.cs",
       "size": 3705,
       "sha256": "5ee59c65c28e242379b14e57c378013b77418c63947a023362a470c4ec6f4246"
+    },
+    {
+      "path": "launcher/widget/config.xml.template",
+      "size": 911,
+      "sha256": "8aadddb7d967f78f850a104aa8f36cce61c2b8f05f4f81215faf000ab03c173e"
+    },
+    {
+      "path": "launcher/widget/quiettv-bridge.js",
+      "size": 7641,
+      "sha256": "f7219b1b0d6fca943238fb0b570bb8e5c8709cc53880be0055622ae5a8d4817a"
+    },
+    {
+      "path": "launcher/widget/README.md",
+      "size": 7093,
+      "sha256": "2373ed6331196d6eb916be878deaf906cb37122b43bdfb31ff7ba4d4a0e1b811"
+    },
+    {
+      "path": "launcher/widget/tv-inputs.js",
+      "size": 2476,
+      "sha256": "da593c476d0e6e70c45a3804b588d88f4c52b0fcfa8b89ba8766c0651313d758"
     },
     {
       "path": "public-llm/community/CODEOWNERS",
@@ -717,6 +777,11 @@
       "sha256": "e9555f2adae2be5570b3eb4d1ee422f318b2429252b46fcd7ef6fb5406fdd808"
     },
     {
+      "path": "public-toolkit/docs/RECOVERY2.md",
+      "size": 9176,
+      "sha256": "afbfc9cf70c3e8c01f434e79cd4fdceee5ff2db0b367c7bbdcd9e5601d7ed5d1"
+    },
+    {
       "path": "public-toolkit/examples/three-app-assemble-spec.example.json",
       "size": 1550,
       "sha256": "aa10b545c77fe9b11ff30db0691a16687037ea9e8c760904d19657b5f4527779"
@@ -748,8 +813,8 @@
     },
     {
       "path": "public-toolkit/tvkit/capsule.py",
-      "size": 35056,
-      "sha256": "76a2fc97048e0f229fc26587f80b20e3d95077adc5c8a8cfb7cb401d35c9078d"
+      "size": 37828,
+      "sha256": "531142e6d3af9539a02af3a2cdbea93aeb8bb3c54db84c0171bf35f66ecf3223"
     },
     {
       "path": "public-toolkit/tvkit/catalogue.py",
@@ -807,6 +872,11 @@
       "sha256": "156572fa24325a742280c2b4dd37eadf533a7b47e798b2ea60b62aac71366fd0"
     },
     {
+      "path": "public-toolkit/tvkit/recovery2.py",
+      "size": 37899,
+      "sha256": "1f30f5e9e33fc6cdc525edace0d22775ca6af343bae5fb05bc18f3b1cf9ec756"
+    },
+    {
       "path": "public-toolkit/tvkit/states.py",
       "size": 3769,
       "sha256": "1be5931914433b6b1943149ff8f4f8a8d742bdfc9154358b8c1c69ef942b8336"
@@ -840,6 +910,16 @@
       "path": "tests/fixtures/consumer/profile-v2.json",
       "size": 1103,
       "sha256": "59aab4cdf64e1b6bf143daa7d609a5a42f52fa47b15fe95e6538e4c78817a987"
+    },
+    {
+      "path": "tests/fixtures/recovery2/boot-policy.json",
+      "size": 430,
+      "sha256": "19ff25983ebd699a32462168f13d5c2114bc791ad8d5a9c6c93a0bd0b128be51"
+    },
+    {
+      "path": "tests/fixtures/recovery2/external-policy.json",
+      "size": 493,
+      "sha256": "7507933693a550966242de063ec302173dcba5917ef5956c076cda35235efad6"
     },
     {
       "path": "tools/xattr-backup/Program.cs",

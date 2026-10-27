@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_public_toolkit_fixtures as fx  # noqa: E402
 import test_public_toolkit_profile_v2 as pv2  # noqa: E402
 from tvkit import assemble as asm, capsule, cli, transport  # noqa: E402
+from tvkit import export as ex  # noqa: E402
 from tvkit.capsule import CapsuleError  # noqa: E402
 from tvkit.profile import device_id_sha256, parse_profile  # noqa: E402
 
@@ -284,12 +286,47 @@ class ExportAllowlist(unittest.TestCase):
         self.assertEqual(sorted(fixture_entries), [
             "tests/fixtures/consumer/components.json",
             "tests/fixtures/consumer/inventory.json",
-            "tests/fixtures/consumer/profile-v2.json"])
+            "tests/fixtures/consumer/profile-v2.json",
+            "tests/fixtures/recovery2/boot-policy.json",
+            "tests/fixtures/recovery2/external-policy.json"])
         for entry in fixture_entries:
             self.assertTrue((fx.ROOT / entry).is_file(), entry)
             text = (fx.ROOT / entry).read_text(encoding="utf-8")
             self.assertNotIn('"deviceId"', text)
             self.assertTrue("org.example" in text or "SYNTHETIC" in text, entry)
+
+    RECOVERY2_FILES = ("public-toolkit/tvkit/recovery2.py", "public-toolkit/docs/RECOVERY2.md",
+                       "tests/test_public_toolkit_recovery2.py", "tests/fixtures/recovery2/boot-policy.json",
+                       "tests/fixtures/recovery2/external-policy.json")
+
+    def run_recovery2_tests(self, root):
+        # -I: no user site, no environment, no current-folder imports; discover adds only the tests folder.
+        tests = root / "tests"
+        return subprocess.run([sys.executable, "-I", "-m", "unittest", "discover", "-s", str(tests),
+                               "-t", str(tests), "-p", "test_public_toolkit_recovery2.py"],
+                              cwd=str(tests), capture_output=True, text=True, timeout=300)
+
+    def test_export_ships_recovery2_source_and_fixtures_and_its_tests_pass(self):
+        if (fx.ROOT / ex.MANIFEST_NAME).exists():  # already an exported tree: check it in place
+            for rel in self.RECOVERY2_FILES:
+                self.assertTrue((fx.ROOT / rel).is_file(), rel)
+            return
+        report = ex.build_report(fx.ROOT, ex.load_allowlist(fx.TOOLKIT / "export-allowlist.json"))
+        self.assertEqual([(v.path, v.rule) for v in report.violations], [])
+        paths = {p for p, _, _ in report.files}
+        for rel in self.RECOVERY2_FILES:
+            self.assertIn(rel, paths)
+        with tempfile.TemporaryDirectory() as tmp:  # fresh folder outside the checkout, no deny/owner inputs
+            out = Path(tmp) / "export"
+            ex.write_export(fx.ROOT, report, out)
+            for rel in self.RECOVERY2_FILES:
+                self.assertEqual((out / rel).read_bytes(), (fx.ROOT / rel).read_bytes(), rel)
+            result = self.run_recovery2_tests(out)
+            self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+            self.assertRegex(result.stderr, r"Ran [1-9]\d* tests")
+            # Negative control: the same exported tree without one fixture fails.
+            (out / "tests/fixtures/recovery2/boot-policy.json").unlink()
+            self.assertNotEqual(self.run_recovery2_tests(out).returncode, 0)
 
 
 if __name__ == "__main__":

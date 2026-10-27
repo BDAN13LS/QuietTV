@@ -44,7 +44,7 @@ test('saved-list fallbacks: missing favorites use the defaults, an emptied list 
 });
 
 test('main.jsx builds every view from the clean pool and writes the clean lists back',()=>{
- assert.match(main,/const allApps=launcherApps\(catalog\);/);
+ assert.match(main,/const allApps=runtime\.apps;/);assert.match(main,/resolveRuntimeApps\(\{compiled:catalog,/);
  assert.match(main,/initialSaved\(allApps,\{order:saved\('quiet-order',\[\]\),favorites:saved\('quiet-favorites',null\),recent:saved\('quiet-recent',\[\]\)\},defaultFavorites\)/);
  assert.match(main,/useState\(start\.order\)/);assert.match(main,/useState\(start\.favorites\)/);assert.match(main,/useState\(start\.recent\)/);
  assert.doesNotMatch(main,/const allApps=\[\.\.\.catalog/,'no second, unfiltered pool');
