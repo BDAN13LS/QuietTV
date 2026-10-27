@@ -2,6 +2,7 @@
 # device-affecting paths additionally need the hardware gate (docs/HARDWARE-GATE.md).
 *                                          @BDAN13LS
 /public-llm/src/quiettv_mcp/device.py      @BDAN13LS
+/public-llm/src/quiettv_mcp/config.py      @BDAN13LS
 /public-llm/src/quiettv_mcp/transport.py   @BDAN13LS
 /public-llm/src/quiettv_mcp/capture.py     @BDAN13LS
 /public-llm/src/quiettv_mcp/profiles.py    @BDAN13LS

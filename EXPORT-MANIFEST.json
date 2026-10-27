@@ -13,18 +13,18 @@
     },
     {
       "path": "README.md",
-      "size": 9836,
-      "sha256": "60423c7672bf59eb6d2815052c7fcaed141795cb913423564dba538abf6b7ea3"
+      "size": 12155,
+      "sha256": "b5d012169e8a3ac495aaf6c4529db708db6e7b4de832b293a53fea6475a0c9dc"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
-      "size": 19583,
-      "sha256": "e1e9b6af55260593903147bb896be42a6ecce691172a9474594df6827c8dfc25"
+      "size": 19718,
+      "sha256": "59a846a1f90f9dfc596b436950e9e9bf6436901c8eca19bbb18d57d1016b699b"
     },
     {
       "path": ".github/CODEOWNERS",
-      "size": 597,
-      "sha256": "5efa909493a8fc93ab929b88fca51d7710cd926f7ad90a9b911cd2a5f900bd39"
+      "size": 651,
+      "sha256": "942e0caf7e9dba75bd9a751d7383f6ec937c22bac83c86616635debedcd7ec9e"
     },
     {
       "path": ".github/public-binaries.txt",
@@ -98,23 +98,23 @@
     },
     {
       "path": "public-llm/pyproject.toml",
-      "size": 735,
-      "sha256": "1b7c728cebc8b894d3904e0544ec6b1862852d6a41eca15e961429ed096ad508"
+      "size": 743,
+      "sha256": "491cde0e8d795e195cf77f6dfc8a1fcfd882e34ffc71551d2909277a0c407eb6"
     },
     {
       "path": "public-llm/README.md",
-      "size": 6714,
-      "sha256": "559b2fb0e5eb5985073f3216ff58325ff9b551aee89e93df9e0969968fdabe46"
+      "size": 12857,
+      "sha256": "7be9f11839910cb42c727ee757f5bdfce8550df44ae0c9d1deb7a034ca3cf850"
     },
     {
       "path": "public-llm/SECURITY.md",
-      "size": 1712,
-      "sha256": "2ef9441c44bcaca06bb7f7a08d81c5728c3f0688a73dffe7faedc06897d3bfe7"
+      "size": 2269,
+      "sha256": "5b9fafb452a01b0267d6cc429d285f76fc590b99bff62235dfb9f5a93340bb6d"
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 5837,
-      "sha256": "60f82975e46d805a9d54f2ba82479a331659d95eb382b59d8d7089d62fc361c3"
+      "size": 5893,
+      "sha256": "fe8f9b92ada3ed8fa28625c1dedab2b28a76a75e165d37f2f5036e566cc4ac00"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -603,8 +603,8 @@
     },
     {
       "path": "public-llm/community/CODEOWNERS",
-      "size": 597,
-      "sha256": "5efa909493a8fc93ab929b88fca51d7710cd926f7ad90a9b911cd2a5f900bd39"
+      "size": 651,
+      "sha256": "942e0caf7e9dba75bd9a751d7383f6ec937c22bac83c86616635debedcd7ec9e"
     },
     {
       "path": "public-llm/community/CONTRIBUTING.md",
@@ -623,18 +623,18 @@
     },
     {
       "path": "public-llm/docs/HARDWARE-GATE.md",
-      "size": 2512,
-      "sha256": "0b7803f0dcae75e1e2a2c145861c0c6354191601b6ebc2b323259a812bbe8731"
+      "size": 2640,
+      "sha256": "75e582044f235880f4d6fcec3cfacfdf831dd3037094669c3ce6f301408aff96"
     },
     {
       "path": "public-llm/docs/LICENSING.md",
-      "size": 1669,
-      "sha256": "c21a35a07f256f25e151566708a888ffb7319608feecc81ca375b6e4fbc35163"
+      "size": 1252,
+      "sha256": "c1021783a62a0830ffd96f79915bc2b4072cbd8331183b7c3545ed22f2809f63"
     },
     {
       "path": "public-llm/docs/SPEC.md",
-      "size": 11455,
-      "sha256": "6dc9e98adcf3c53c269ba4cc2a1b8c627689d496aaf8cb5f8b667ab23e8ce638"
+      "size": 13635,
+      "sha256": "ca418917df421abc07b56c5b18a994747c8f47482eb2d48e9b375941d1a742de"
     },
     {
       "path": "public-llm/docs/TOOLKIT-ADAPTER.md",
@@ -643,8 +643,8 @@
     },
     {
       "path": "public-llm/tests/conftest.py",
-      "size": 1665,
-      "sha256": "f5c038c207c68c441f9ed8ccff314626adc76f6e5b34eb8a2f7d011295091016"
+      "size": 2084,
+      "sha256": "86fb1a4321dd5321c70edef50a5dcd528bba25de6605c0a98f1060f91f3097f5"
     },
     {
       "path": "public-llm/tests/fake_tv.py",
@@ -698,13 +698,13 @@
     },
     {
       "path": "public-llm/tests/test_setup.py",
-      "size": 4960,
-      "sha256": "22225b71e6a111c9e667d8d6ca3f1ee32a9dccbaaf680ec87dd1fecb825a9eca"
+      "size": 5921,
+      "sha256": "6331a9c8b9f51ca2e3f2e2eeebd713dd0e186a6a70c7926097a470e8b26433b7"
     },
     {
       "path": "public-llm/tests/test_stdio.py",
-      "size": 3705,
-      "sha256": "0edca277152ed62693d849011fc3cda9bb857e922ef3b70b21124079092bd05a"
+      "size": 5245,
+      "sha256": "cdb9efc8a5a707ed76913e9dfba4cea1bf6a34cdc8905a4f759429bb7fd9fb8d"
     },
     {
       "path": "public-llm/tools/check_attestation.py",
@@ -743,18 +743,18 @@
     },
     {
       "path": "public-llm/src/quiettv_mcp/cli.py",
-      "size": 5359,
-      "sha256": "71d759fd64e8a9c3dbece68797c0233f9b423f82ae0761009bffb80156c284cd"
+      "size": 5549,
+      "sha256": "7d5113e3a44ce1afe7f9ffae56a1a0e9865dee0512a948a96326a51809d4b1aa"
     },
     {
       "path": "public-llm/src/quiettv_mcp/config.py",
-      "size": 7554,
-      "sha256": "4da5bf2f633a484c84e90f50d89408bc2a181dd47cf790f2678e18d73bf90e0d"
+      "size": 10085,
+      "sha256": "d64953b1ace9080c8c6a63f0efc2ca92acd6e8c28bec58936454bc08f3dc0a8b"
     },
     {
       "path": "public-llm/src/quiettv_mcp/device.py",
-      "size": 12070,
-      "sha256": "62712a2d0b2aab4c81804a60a60d19998ce0fad7f75442a2c7be28b36af1b5da"
+      "size": 14729,
+      "sha256": "587b58506b50cde66e48383d0b1c08282ee4440efbf88173c91e81fe9cbb63db"
     },
     {
       "path": "public-llm/src/quiettv_mcp/profiles.py",
@@ -768,13 +768,13 @@
     },
     {
       "path": "public-llm/src/quiettv_mcp/server.py",
-      "size": 8027,
-      "sha256": "e6563d2f4cf8711cad2f7d7f9bba1f352ea1039985b4fc79cfd6fe397b22e45f"
+      "size": 9534,
+      "sha256": "cb63c4bdd4b61246be18cb1214a2b7fd4fa825818ae8995a940afcb086c9ab86"
     },
     {
       "path": "public-llm/src/quiettv_mcp/setup_cli.py",
-      "size": 10222,
-      "sha256": "fa131ea90292f9e41b9bc7806f1ab856a78be30db8f2ae528858e6c7893d37d1"
+      "size": 11737,
+      "sha256": "7957093cb8c81a6b81406a5dd538cb28940ee1b7fa84447330ddaafe41106b2f"
     },
     {
       "path": "public-llm/src/quiettv_mcp/summaries.py",
@@ -1040,6 +1040,26 @@
       "path": "docs/CLEANUP-STATUS.md",
       "size": 4296,
       "sha256": "b2fe7ca9aa3cbe31ce2d2f2adb574babc745c66ba9977627ec45d141d829c1e9"
+    },
+    {
+      "path": "LICENSE",
+      "size": 1075,
+      "sha256": "e42a2fb36f4e3065df7e5ae89e60494e35d0351c9f85f46a68d7ab5c86685ebf"
+    },
+    {
+      "path": "docs/INSTALL-OPTIONS.md",
+      "size": 4735,
+      "sha256": "b5de37fe430706f33f993d259f0e0c5a3c7dddd08e3e3cdec7db83077e2bc7c7"
+    },
+    {
+      "path": "public-llm/tests/stdio_wake_fixture_server.py",
+      "size": 985,
+      "sha256": "0bd7211dfaeef496be100f1615e7f3c652108c7284529d2d34d6f5354d49e0b6"
+    },
+    {
+      "path": "public-llm/tests/test_wake.py",
+      "size": 14961,
+      "sha256": "3f456d7a4e183837dc1713a3f4fc6bd07c9309f4f6aca135731c9532dbd9d2f1"
     }
   ],
   "excluded": [
@@ -1130,8 +1150,8 @@
       "reason": "Owner backups, keys and stock payloads. Never exported."
     },
     {
-      "path": "docs/ (except docs/screenshots/ and docs/CLEANUP-STATUS.md)",
-      "reason": "Private session notes remain excluded; only explicitly reviewed cleanup status and screenshots are published."
+      "path": "docs/ (except docs/screenshots/, docs/CLEANUP-STATUS.md and docs/INSTALL-OPTIONS.md)",
+      "reason": "Private session notes remain excluded; only explicitly reviewed cleanup status, install options and screenshots are published."
     },
     {
       "path": "run_root.py, root_compat.py, receive_backup.py, tools/sdb-tunnel-client.cjs",

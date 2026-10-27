@@ -34,7 +34,7 @@ there is no download-and-install release yet. The planned setup needs no AI
 or subscription, with AI control available as an optional route.
 
 [Install plan and upstream tools](docs/INSTALL-OPTIONS.md) ·
-[Optional AI/MCP setup, remote control and screenshots](public-llm/README.md)
+[Optional AI/MCP setup, wake, remote control and screenshots](public-llm/README.md)
 
 ![QuietTV home screen in day mode with scenic mountain artwork, app row and recent apps](docs/screenshots/home-day.png)
 
@@ -209,7 +209,13 @@ IPTV player. See [public-llm/docs/LICENSING.md](public-llm/docs/LICENSING.md).
 
 ## For developers using AI assistants (optional)
 
-You never need AI for install, use or restore. If you want to drive a test
-TV from an AI client, see the optional MCP package in
-[public-llm/README.md](public-llm/README.md). Models may refuse device
-work; the plain command line is always available.
+AI is optional. The [complete MCP setup guide](public-llm/README.md) covers
+installation, private owner configuration, client setup for Claude Desktop,
+Claude Code, Codex and OpenCode, remote controls, screenshots and optional
+**Wake TV**. Wake sends a packet; a separate status check confirms the TV is
+reachable. Network power-on must be enabled on the TV.
+
+This controller currently needs an already-installed QuietTV service and its
+owner key. It does not yet install QuietTV on a stock TV. Some models refuse
+device/root work; compatibility with older Claude versions is untested. The
+same controls are available from the plain command line.

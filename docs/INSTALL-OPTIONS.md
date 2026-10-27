@@ -2,7 +2,7 @@
 
 **Research and design note, not a completed integration.** Nothing here
 installs anything today. QuietTV has no consumer installer, and this page
-does not choose a repository licence (still pending). It covers public
+does not change the project's MIT licence. It covers public
 code and documents only; no TV was involved. No issues or pull requests have
 been opened with any project named here, and no contact has been made.
 
@@ -70,7 +70,8 @@ host setting; QuietTV must not copy that step without testing recovery.
 
 ## AI and Wake-on-LAN
 
-AI is optional. A plain GUI/CLI comes first. The public MCP package is already
-a controller for an installed TV; it is not a stock-root bootstrap. A
-Wake-on-LAN feature is **planned, pending merge from another lane, and not
-working yet**.
+AI is optional. The [full MCP setup guide](../public-llm/README.md) includes
+client setup, private configuration, screenshots, remote control and optional
+Wake-on-LAN. This is a controller for an installed TV, not a stock-root
+bootstrap. Offline checks and a real MCP wake-packet/status round trip passed
+with the TV already on. Waking this build from standby has not been verified.
