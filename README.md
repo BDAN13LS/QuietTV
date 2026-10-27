@@ -21,8 +21,9 @@ cleanup. The launcher and cleanup below are already running on the test TV.
 - **Also blocks:** selected remaining Samsung background services. Some
   read-only components are blocked rather than deleted. This is not proof
   that every tracking path is gone.
-- **Keeps:** picture/sound settings, TV/HDMI sources, volume, core security,
-  network, native streaming apps, Browser, and Store/update dependencies.
+- **Keeps:** Tizen's OS and drivers, picture/sound settings, TV/HDMI sources,
+  volume, core security, network, native streaming apps, Browser, and
+  Store/update dependencies.
   Two shared packages are held until their dependencies are verified.
 - **Measured storage reclaimed:** about **250 MiB**, excluding the separate
   analytics removal. RAM savings have not been measured.
