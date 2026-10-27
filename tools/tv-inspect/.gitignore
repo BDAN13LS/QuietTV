@@ -1,0 +1,3 @@
+# Build output and SDK caches from the offline build and tests.
+bin/
+obj/
