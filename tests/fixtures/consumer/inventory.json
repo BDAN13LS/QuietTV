@@ -1,0 +1,49 @@
+{
+  "schema": "tvkit-inventory/1",
+  "profileId": "SYNTHETIC-QTV0001-0000.1-armv7l-tizen9",
+  "deviceIdSha256": "a96b48552ce8c037b251d0e1b52bf78bcdf22020ffa4316bc3dd952a6a570854",
+  "packages": [
+    {
+      "packageId": "org.example.guide",
+      "version": "1.0.0",
+      "sha256": "045534cdf9c978a464604963b2463a0a317d90c43f4ea76768a19a44e83c9039",
+      "installRoot": "/opt/usr/apps"
+    },
+    {
+      "packageId": "org.example.feeds",
+      "version": "1.0.0",
+      "sha256": "d099cbb596dce1c73d8637ed7408bf4d2c21785366fc1f596583544d47cfc817",
+      "installRoot": "/opt/usr/apps"
+    },
+    {
+      "packageId": "org.example.tvplus",
+      "version": "1.0.0",
+      "sha256": "43f56918f47f9992a30fb725740b30e4bd0b142cf10557b800b2d9cdb27e84e3",
+      "installRoot": "/opt/usr/apps"
+    },
+    {
+      "packageId": "org.example.tvplus-data",
+      "version": "1.0.0",
+      "sha256": "827a7272920d8735ecf2d8fde6cadc6b65eb87ea5ae7b302d6ad65554fe7cee0",
+      "installRoot": "/opt/usr/apps"
+    },
+    {
+      "packageId": "org.example.discovery",
+      "version": "1.0.0",
+      "sha256": "8827095392b74bfd31b8563a47c837e4eda8b27e5ea55fdd05e494ee0616e5ce",
+      "installRoot": "/opt/usr/apps"
+    },
+    {
+      "packageId": "org.example.voice",
+      "version": "1.0.0",
+      "sha256": "ebacd97db77307344efd807237dff4212c5d77c99b312eb82b0af24c064a32c8",
+      "installRoot": "/opt/usr/apps"
+    },
+    {
+      "packageId": "org.example.securityinfo",
+      "version": "1.0.0",
+      "sha256": "be63b516ff7de2e268c5de2f5d8d16b9cb0be683c71f536928a38253b1b814d6",
+      "installRoot": "/opt/usr/apps"
+    }
+  ]
+}

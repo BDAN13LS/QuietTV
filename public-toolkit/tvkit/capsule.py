@@ -34,7 +34,8 @@ from typing import Any, BinaryIO, Iterator, Mapping
 
 from . import strictjson as sj
 from .paths import PathRuleError, ancestors, check_relative, is_identifier, is_sha256, parent_of
-from .profile import MATCH_FIELDS, Profile, ProfileError, device_id_sha256, is_placeholder
+from .profile import (MATCH_FIELDS, PROFILE_SCHEMA, Profile, ProfileError, device_id_sha256,
+                      is_placeholder, match_device)
 
 CAPSULE_SCHEMA = "tvkit-capsule/1"
 MANIFEST_NAME = "capsule.json"
@@ -479,8 +480,23 @@ def _parse_system_keys(profile: Profile, value: Any) -> tuple[SystemKeyChange, .
     return tuple(changes)
 
 
+def require_capsule1_profile(profile: Profile) -> None:
+    """capsule/1 can only bind the version 1 match fields.
+
+    Its manifest has no place for firmwareBuild or region, so it cannot
+    authorize recovery under a profile that matches on them (profile/2). Any
+    schema other than tvkit-profile/1 is refused rather than half-checked.
+    """
+    if profile.schema != PROFILE_SCHEMA:
+        raise CapsuleError(
+            f"{CAPSULE_SCHEMA} cannot bind firmware build or region, so it cannot be used "
+            f"with {profile.schema} profile {profile.profile_id}; refusing"
+        )
+
+
 def parse_manifest(data: Any, profile: Profile) -> Capsule:
     try:
+        require_capsule1_profile(profile)
         return _parse_manifest(data, profile)
     except (sj.StrictJsonError, PathRuleError, ProfileError) as exc:
         raise CapsuleError(str(exc)) from exc
@@ -716,6 +732,7 @@ def validate(
         if names != referenced:
             raise CapsuleError("capsule contains missing or unexpected files")
         if device_facts is not None:
+            _wrap("device facts", match_device, profile, device_facts)
             for name in MATCH_FIELDS:
                 if device_facts.get(name) != capsule.device[name]:
                     raise CapsuleError(f"device {name} does not match the capsule; refusing")

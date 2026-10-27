@@ -1,4 +1,18 @@
-# Frontend third-party notices
+# Third-party notices
+
+## Native remote input adaptation (source release preparation)
+
+The private native host's Home-key forwarding code was adapted from
+`payloads/common/SamsungTvRemoteInputAgent.cs` in
+[chris-ritsen/samsung-tv-root, commit4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b](https://github.com/chris-ritsen/samsung-tv-root/blob/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b/payloads/common/SamsungTvRemoteInputAgent.cs).
+The upstream repository declares the
+[Unlicense](https://github.com/chris-ritsen/samsung-tv-root/blob/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b/LICENSE).
+The adaptation consumes Home and forwards other key events; it is not a
+kernel patch. The native host is not included in this developer-preview
+export yet. This attribution does not select a repository-wide licence
+for QuietTV.
+
+## Frontend runtime packages
 
 Installed runtime packages. Build tools are not shipped in the TV bundle. Native app artwork remains the respective brands’ artwork; IPTV logo and wallpaper were generated for this project.
 

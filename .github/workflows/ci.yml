@@ -44,6 +44,7 @@ jobs:
         run: |
           .venv/bin/python -m unittest discover -s tests -p 'test_public_toolkit_*.py' -q
           .venv/bin/python -m unittest discover -s tests -p 'test_optional_app_plan.py' -q
+          .venv/bin/python -m unittest discover -s tests -p 'test_rescue*.py' -q
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "24"

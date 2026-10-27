@@ -1,0 +1,183 @@
+{
+  "schema": "tvkit-components/1",
+  "profileId": "SYNTHETIC-QTV0001-0000.1-armv7l-tizen9",
+  "components": [
+    {
+      "id": "example.guide",
+      "packageIds": [
+        "org.example.guide"
+      ],
+      "expectedVersions": {
+        "org.example.guide": {
+          "version": "1.0.0",
+          "sha256": "045534cdf9c978a464604963b2463a0a317d90c43f4ea76768a19a44e83c9039"
+        }
+      },
+      "title": "Synthetic example.guide",
+      "explain": "Synthetic test component. Not a real Samsung package.",
+      "category": "content",
+      "recommended": true,
+      "allowedActions": [
+        "remove"
+      ],
+      "dependsOn": [],
+      "consequences": [
+        "Synthetic consequence for tests."
+      ],
+      "restoreSupported": true,
+      "evidence": [
+        "synthetic fixture; no hardware evidence"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "id": "example.feeds",
+      "packageIds": [
+        "org.example.feeds"
+      ],
+      "expectedVersions": {
+        "org.example.feeds": {
+          "version": "1.0.0",
+          "sha256": "d099cbb596dce1c73d8637ed7408bf4d2c21785366fc1f596583544d47cfc817"
+        }
+      },
+      "title": "Synthetic example.feeds",
+      "explain": "Synthetic test component. Not a real Samsung package.",
+      "category": "privacy",
+      "recommended": true,
+      "allowedActions": [
+        "remove"
+      ],
+      "dependsOn": [],
+      "consequences": [
+        "Synthetic consequence for tests."
+      ],
+      "restoreSupported": true,
+      "evidence": [
+        "synthetic fixture; no hardware evidence"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "id": "example.tvplus",
+      "packageIds": [
+        "org.example.tvplus",
+        "org.example.tvplus-data"
+      ],
+      "expectedVersions": {
+        "org.example.tvplus": {
+          "version": "1.0.0",
+          "sha256": "43f56918f47f9992a30fb725740b30e4bd0b142cf10557b800b2d9cdb27e84e3"
+        },
+        "org.example.tvplus-data": {
+          "version": "1.0.0",
+          "sha256": "827a7272920d8735ecf2d8fde6cadc6b65eb87ea5ae7b302d6ad65554fe7cee0"
+        }
+      },
+      "title": "Synthetic example.tvplus",
+      "explain": "Synthetic test component. Not a real Samsung package.",
+      "category": "content",
+      "recommended": true,
+      "allowedActions": [
+        "remove"
+      ],
+      "dependsOn": [
+        "example.feeds"
+      ],
+      "consequences": [
+        "Synthetic consequence for tests."
+      ],
+      "restoreSupported": true,
+      "evidence": [
+        "synthetic fixture; no hardware evidence"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "id": "example.discovery",
+      "packageIds": [
+        "org.example.discovery"
+      ],
+      "expectedVersions": {
+        "org.example.discovery": {
+          "version": "1.0.0",
+          "sha256": "8827095392b74bfd31b8563a47c837e4eda8b27e5ea55fdd05e494ee0616e5ce"
+        }
+      },
+      "title": "Synthetic example.discovery",
+      "explain": "Synthetic test component. Not a real Samsung package.",
+      "category": "content",
+      "recommended": false,
+      "allowedActions": [
+        "remove"
+      ],
+      "dependsOn": [
+        "example.feeds"
+      ],
+      "consequences": [
+        "Synthetic consequence for tests."
+      ],
+      "restoreSupported": true,
+      "evidence": [
+        "synthetic fixture; no hardware evidence"
+      ],
+      "status": "reviewed"
+    },
+    {
+      "id": "example.voice",
+      "packageIds": [
+        "org.example.voice"
+      ],
+      "expectedVersions": {
+        "org.example.voice": {
+          "version": "1.0.0",
+          "sha256": "ebacd97db77307344efd807237dff4212c5d77c99b312eb82b0af24c064a32c8"
+        }
+      },
+      "title": "Synthetic example.voice",
+      "explain": "Synthetic test component. Not a real Samsung package.",
+      "category": "voice",
+      "recommended": false,
+      "allowedActions": [
+        "remove"
+      ],
+      "dependsOn": [],
+      "consequences": [
+        "Synthetic consequence for tests."
+      ],
+      "restoreSupported": true,
+      "evidence": [
+        "synthetic fixture; no hardware evidence"
+      ],
+      "status": "draft"
+    },
+    {
+      "id": "example.securityinfo",
+      "packageIds": [
+        "org.example.securityinfo"
+      ],
+      "expectedVersions": {
+        "org.example.securityinfo": {
+          "version": "1.0.0",
+          "sha256": "be63b516ff7de2e268c5de2f5d8d16b9cb0be683c71f536928a38253b1b814d6"
+        }
+      },
+      "title": "Synthetic example.securityinfo",
+      "explain": "Synthetic test component. Not a real Samsung package.",
+      "category": "security-ui",
+      "recommended": false,
+      "allowedActions": [
+        "remove"
+      ],
+      "dependsOn": [],
+      "consequences": [
+        "Synthetic consequence for tests."
+      ],
+      "restoreSupported": true,
+      "evidence": [
+        "synthetic fixture; no hardware evidence"
+      ],
+      "status": "reviewed"
+    }
+  ]
+}

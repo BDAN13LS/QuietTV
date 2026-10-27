@@ -125,6 +125,12 @@ Read the [consumer install design](docs/CONSUMER-INSTALL-DESIGN-2026-10-27.md)
 and the [phased implementation plan](docs/superpowers/plans/2026-10-27-consumer-install.md).
 These describe planned work, not an installer available today.
 
+Implementation is underway. A [TV browser setup-page test](public-toolkit/docs/D0-BROWSER-PROBE.md)
+passed on the test TV. The [offline engine](public-toolkit/docs/D1-ENGINE.md)
+and [backup readback gate](public-toolkit/docs/D2-READBACK.md) have automated
+tests. A separate [Rescue engine](rescue/README.md) is also tested offline.
+These foundations do not yet install or restore a consumer TV.
+
 ## Contributing
 
 Fork, open a pull request, let the offline checks run, and wait for review.
