@@ -201,8 +201,11 @@ Hardware claims need evidence at the exact commit. See
 
 ## Licence
 
-No repository-wide licence has been chosen yet; the owner is deciding. Component licences are in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+The original QuietTV code is released under the [MIT licence](LICENSE).
+Third-party components keep their own licences, listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The grant does not cover Samsung
+firmware or apps, third-party brand artwork, or unpublished source such as the
+IPTV player. See [public-llm/docs/LICENSING.md](public-llm/docs/LICENSING.md).
 
 ## For developers using AI assistants (optional)
 

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Local stdio MCP server for one owner-configured Quiet TV: status, Home, remote keys, app launch, diagnostics, fresh screen capture and optional Wake-on-LAN."
 readme = "README.md"
 requires-python = ">=3.11"
-# Licence is a parent-repository decision; docs/LICENSING.md carries the MIT proposal.
+license = { text = "MIT" }  # see docs/LICENSING.md and the root LICENSE
 dependencies = [
     "mcp>=2.3,<3",
 ]
