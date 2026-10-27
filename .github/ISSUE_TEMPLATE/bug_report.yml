@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in the MCP server, setup or doctor behaves wrongly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste your control key, TV IP or MAC address, tokens, or screenshots of private content.
+        Run `quiettv-mcp doctor` and paste its output; it is redacted by design.
+  - type: input
+    id: version
+    attributes:
+      label: quiettv-mcp version or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: TV model code
+      placeholder: UN43U8000FBXZA
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: TV software version
+      placeholder: "1300.8"
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options: [Claude Desktop, Codex, OpenCode, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `quiettv-mcp doctor`
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: I removed keys, IP/MAC addresses, tokens and personal paths from everything above.
+          required: true

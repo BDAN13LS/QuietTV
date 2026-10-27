@@ -1,0 +1,76 @@
+# Template for .github/workflows/ci.yml in the public repository.
+# Untrusted pull requests run read-only on GitHub-hosted runners with no secrets,
+# no device access and no self-hosted runners. Paths assume the exported repo keeps
+# the public-llm/ folder; adjust PKG if it is exported to the repository root.
+# Action pins were resolved with `git ls-remote` against the official repositories
+# on 2026-10-26: actions/checkout v7.0.1, actions/setup-python v7.1.0.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PKG: public-llm
+
+jobs:
+  offline-checks:
+    name: Offline checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install into a project venv
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e "./${PKG}[test]"
+      - name: Unit, fake-TV and stdio MCP tests (no device, no network to any TV)
+        run: .venv/bin/python -m pytest "${PKG}/tests" -q
+      - name: Backup, restore-plan and export tests (offline fixtures only)
+        run: |
+          .venv/bin/python -m unittest discover -s tests -p 'test_public_toolkit_*.py' -q
+          .venv/bin/python -m unittest discover -s tests -p 'test_optional_app_plan.py' -q
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "24"
+      - name: Frontend source checks
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm test
+          npm run build
+
+  public-source-guard:
+    name: Public source guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Scan the whole tree for private material
+        # Reviewed binaries (artwork, README screenshots) pass only via .github/public-binaries.txt
+        # ("<path> <sha256>"); deliberate negative-control test fixtures only via
+        # .github/public-fixture-approvals.txt ("<path> <sha256> <reason>", tests/ or fixtures/ paths only).
+        run: |
+          set -- .
+          if [ -f .github/public-binaries.txt ]; then set -- "$@" --allow-binaries .github/public-binaries.txt; fi
+          if [ -f .github/public-fixture-approvals.txt ]; then set -- "$@" --approve-fixtures .github/public-fixture-approvals.txt; fi
+          python "${PKG}/tools/public_source_guard.py" "$@"

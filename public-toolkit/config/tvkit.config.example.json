@@ -1,0 +1,7 @@
+{
+  "schema": "tvkit-config/1",
+  "profileId": "UN43U8000FBXZA-1300.8-armv7l-tizen9",
+  "releaseRepoUrl": "https://github.com/BDAN13LS/QuietTV",
+  "capsuleStore": "<CONFIGURE: a folder on your PC or NAS, never on the TV>",
+  "transport": "<CONFIGURE: name of your own privileged transport adapter, if you have one>"
+}

@@ -1,0 +1,10 @@
+# Template for .github/CODEOWNERS. Every path needs the maintainer's review;
+# device-affecting paths additionally need the hardware gate (docs/HARDWARE-GATE.md).
+*                                          @BDAN13LS
+/public-llm/src/quiettv_mcp/device.py      @BDAN13LS
+/public-llm/src/quiettv_mcp/transport.py   @BDAN13LS
+/public-llm/src/quiettv_mcp/capture.py     @BDAN13LS
+/public-llm/src/quiettv_mcp/profiles.py    @BDAN13LS
+/public-llm/src/quiettv_mcp/server.py      @BDAN13LS
+/public-llm/src/quiettv_mcp/toolkit.py     @BDAN13LS
+/.github/                                  @BDAN13LS

@@ -1,0 +1,64 @@
+{
+  "schema": "tvkit-assemble-spec/1",
+  "packages": [
+    {
+      "packageId": "org.example.alpha",
+      "installRoot": "/opt/usr/apps/org.example.alpha",
+      "payload": "org.example.alpha.tar",
+      "xattrManifest": "org.example.alpha.json"
+    },
+    {
+      "packageId": "org.example.bravo",
+      "installRoot": "/opt/usr/apps/org.example.bravo",
+      "payload": "org.example.bravo.tar",
+      "xattrManifest": "org.example.bravo.json"
+    },
+    {
+      "packageId": "org.example.charlie",
+      "installRoot": "/opt/usr/apps/org.example.charlie",
+      "payload": "org.example.charlie.tar",
+      "xattrManifest": "org.example.charlie.json"
+    }
+  ],
+  "registryChanges": [
+    {
+      "appId": "org.example.alpha",
+      "fields": {
+        "app_disable": {
+          "before": "false",
+          "applied": "true"
+        },
+        "app_onboot": {
+          "before": "true",
+          "applied": "false"
+        }
+      }
+    },
+    {
+      "appId": "org.example.bravo",
+      "fields": {
+        "app_disable": {
+          "before": "0",
+          "applied": "1"
+        }
+      }
+    }
+  ],
+  "systemKeys": [
+    {
+      "key": "db/appfw/startup_appid",
+      "original": "org.example.viewer",
+      "expectedCurrent": "Example2026.Launcher"
+    },
+    {
+      "key": "db/appfw/home_appid",
+      "original": "org.example.home",
+      "expectedCurrent": "Example2026.Launcher"
+    }
+  ],
+  "ourPackages": [
+    {
+      "packageId": "Example2026.Launcher"
+    }
+  ]
+}

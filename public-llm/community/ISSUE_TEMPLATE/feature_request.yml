@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a new tool, profile or improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Out of scope: arbitrary shell or file access on the TV, firmware flashing, cloud relays,
+        and generic support for unverified TV models. New device profiles need a maintainer with
+        that exact model and firmware to attest real-device results.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do, and why
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed tool or change (inputs, outputs, read-only or not)
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Would it change what is sent to the TV?
+      options: ["No", "Yes", "Not sure"]
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: How could it fail, and how would we prove it works?

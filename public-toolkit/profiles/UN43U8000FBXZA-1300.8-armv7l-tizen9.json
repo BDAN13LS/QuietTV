@@ -1,0 +1,64 @@
+{
+  "schema": "tvkit-profile/1",
+  "profileId": "UN43U8000FBXZA-1300.8-armv7l-tizen9",
+  "match": {
+    "model": "UN43U8000FBXZA",
+    "firmware": "1300.8",
+    "arch": "armv7l",
+    "osName": "Tizen",
+    "osVersion": "9"
+  },
+  "installRoots": [
+    "/opt/usr/apps",
+    "/usr/apps"
+  ],
+  "registry": {
+    "table": "package_app_info",
+    "key": "app_id",
+    "fields": [
+      "app_disable",
+      "app_onboot",
+      "app_autorestart"
+    ],
+    "values": [
+      "true",
+      "false",
+      "1",
+      "0"
+    ]
+  },
+  "systemKeys": [
+    "db/appfw/startup_appid",
+    "db/appfw/home_appid"
+  ],
+  "protectedIdSubstrings": [
+    "setting",
+    "hdmi",
+    "audio",
+    "sound",
+    "volume",
+    "network",
+    "wifi",
+    "wlan",
+    "ethernet",
+    "bluetooth",
+    "security",
+    "csfs",
+    "firmware",
+    "update",
+    "store",
+    "webengine",
+    "chromium",
+    "ewk",
+    "drm",
+    "tv-viewer",
+    "source"
+  ],
+  "manualPrerequisites": [
+    "Developer Mode enabled on the TV by the owner, with the owner's PC as the trusted host.",
+    "A root-capable privileged transport for this exact firmware. Not included in this toolkit; the owner supplies it.",
+    "The owner's own Samsung/Tizen signing certificate for installing the launcher package. Never shipped here.",
+    "The XattrBackup helper built from tools/xattr-backup and a .NET 6 runtime on the TV for xattr dump and restore.",
+    "A remote control within reach and the owner present for every verify-control step."
+  ]
+}

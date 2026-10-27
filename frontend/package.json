@@ -1,0 +1,1 @@
+{"name":"quiet-tv-ui","version":"0.1.0","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1 --port 4176 --strictPort","build":"vite build","test":"node --test tests/*.test.mjs"},"dependencies":{"@noriginmedia/norigin-spatial-navigation":"3.3.0","lucide-react":"1.59.0","motion":"14.3.0","react":"19.3.1","react-dom":"19.3.1"},"devDependencies":{"vite":"8.3.4"}}

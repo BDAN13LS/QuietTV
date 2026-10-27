@@ -1,0 +1,9 @@
+export const SYSTEM_APPS=Object.freeze({settings:'com.samsung.tv.quicksetting',store:'com.samsung.tv.store'});
+export function allowedAction(action,apps){return !!action&&((action.type==='launch'&&typeof action.id==='string'&&(apps.some(a=>a.Id===action.id)||Object.values(SYSTEM_APPS).includes(action.id)))||(action.type==='home')||(action.type==='close'));}
+export function normalizeOrder(saved,apps){const ids=new Set(apps.map(a=>a.Id));return [...new Set([...(Array.isArray(saved)?saved:[]).filter(id=>ids.has(id)),...apps.map(a=>a.Id)])];}
+export function previousToClose(current,target,apps){const native=id=>id==='9Ur5IzDKqV.TizenYouTube'?'com.samsung.tv.cobalt-yt':id;return current&&current!==native(target)&&apps.some(a=>native(a.Id)===current)?current:'';}
+export function homeApps(apps,favorites,count=5){const selected=new Set(Array.isArray(favorites)?favorites:[]);const ordered=[...apps.filter(a=>selected.has(a.Id)),...apps.filter(a=>!selected.has(a.Id))];const iptv=ordered.find(a=>a.Id==='quiet.iptv');return iptv?[...ordered.filter(a=>a.Id!=='quiet.iptv').slice(0,count-1),iptv]:ordered.slice(0,count);}
+export function recordRecent(previous,id,apps){return apps.some(a=>a.Id===id)?[id,...(Array.isArray(previous)?previous:[]).filter(x=>x!==id&&apps.some(a=>a.Id===x))].slice(0,8):previous;}
+export function searchApps(apps,query){return apps.filter(a=>a.Name.toLocaleLowerCase().includes(String(query).trim().toLocaleLowerCase()));}
+export function recentApps(previous,apps,limit=5){const byId=new Map(apps.map(app=>[app.Id,app]));return [...new Set(Array.isArray(previous)?previous:[])].filter(id=>typeof id==='string'&&byId.has(id)).slice(0,Math.max(0,limit)).map(id=>byId.get(id));}
+export function homeFocus(last,apps){const candidate=typeof last==='string'?last.replace(/^grid-/,'home-'):last;return apps.some(a=>`home-${a.Id}`===candidate)?candidate:`home-${apps[0]?.Id}`;}

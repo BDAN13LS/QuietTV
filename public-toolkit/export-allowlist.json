@@ -1,0 +1,68 @@
+{
+  "schema": "tvkit-export-allowlist/1",
+  "include": [
+    "public-toolkit/",
+    "tests/test_public_toolkit_*.py",
+    "tools/xattr-backup/Program.cs",
+    "tools/xattr-backup/SelfTests.cs",
+    "tools/xattr-backup/XattrBackup.csproj",
+    "tools/xattr-backup/README.md",
+    "tools/plan_optional_apps.py",
+    "tests/test_optional_app_plan.py",
+    "THIRD-PARTY-NOTICES.md"
+  ],
+  "includeIfPresent": [
+    "README.md",
+    "docs/screenshots/"
+  ],
+  "requireMarker": [
+    {
+      "path": "README.md",
+      "marker": "<!-- quiettv:public -->",
+      "reason": "The repository README ships only once it is the public README and carries the line <!-- quiettv:public -->. Without it this is the private workspace README and stays out."
+    }
+  ],
+  "exclude": [],
+  "notExported": [
+    {
+      "path": "frontend/",
+      "reason": "Launcher UI source. Exported only with --with-frontend, through public-toolkit/frontend-export.json and its transforms (unconfigured weather location, no icons extracted from the TV, PNG metadata removed)."
+    },
+    {
+      "path": "app/",
+      "reason": "RELEASE BLOCKER: native .NET launcher host the TV runs (Program.cs, State.cs, RemoteGate.cs, WebFrontend.cs and others). Device-side and not positively audited for a public build. Without it the frontend has no TV-side host."
+    },
+    {
+      "path": "boot/",
+      "reason": "RELEASE BLOCKER: the registered Home widget (config.xml, icon.png, bridge.js, home.js, tv-inputs.js), its privileged on-boot service (service/) and native payload (payload/*.dll), plus early-boot work and device captures from the owner's TV. Device-side; config.xml names the owner and points at the excluded service. Never exported."
+    },
+    {
+      "path": "iptv/",
+      "reason": "RELEASE BLOCKER: the IPTV player (C# host plus web app). Not positively audited; bundles third-party scripts (an Anthropic SDK build, hls.js, a QR library) whose licences are not yet recorded."
+    },
+    {
+      "path": "vendor/",
+      "reason": "Third-party root payload. This toolkit is not a root bypass and does not redistribute it."
+    },
+    {
+      "path": "private/",
+      "reason": "Owner backups, keys and stock payloads. Never exported."
+    },
+    {
+      "path": "docs/ (all but docs/screenshots/)",
+      "reason": "Session notes about the owner's TV, network and home. Not public documentation. docs/screenshots/ ships when present, after the same scans."
+    },
+    {
+      "path": "run_root.py, root_compat.py, receive_backup.py, tools/sdb-tunnel-client.cjs",
+      "reason": "Privileged transport and root tooling. Stays with the owner; the public toolkit ships no transport."
+    },
+    {
+      "path": "*.json, *.txt, *.png at the repository root",
+      "reason": "Raw device captures, results and screenshots from the owner's TV."
+    },
+    {
+      "path": "public-llm/",
+      "reason": "Export this package separately using its positive tracked file list and public_source_guard.py, including actual-owner deny hashes. Its documented synthetic MAC/LAN and planted-secret fixtures intentionally fail this toolkit generic scanner. Do not relax either scanner or publish the private repository/history."
+    }
+  ]
+}

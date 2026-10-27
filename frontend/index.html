@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=1920,initial-scale=1"><title>Quiet TV</title>
+<!-- First-paint splash: inline, no bundle, no images. Frame zero uses the settled wordmark layout (matching nominal centre, type, colours and line); physical native-to-web alignment still needs a TV check; only the veil fades in, then veil and word breathe together. src/boot-ready.mjs retires it once the dashboard has painted. -->
+<style>
+#boot-splash{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483000;pointer-events:none;overflow:hidden;background:#050506;transition:opacity .7s cubic-bezier(.47,0,.53,1)}
+#boot-splash.boot-splash-out{opacity:0}
+#boot-splash .bs-veil{position:absolute;left:0;right:0;top:0;bottom:0;background:radial-gradient(ellipse 36.8vw 33.5vh at 50% 47.8%,rgba(228,230,235,.1),rgba(228,230,235,.078) 25%,rgba(228,230,235,.037) 50%,rgba(228,230,235,.0105) 75%,rgba(228,230,235,0));animation:bs-in 1.6s cubic-bezier(.47,0,.53,1) both,bs-breathe 8s ease-in-out 2.6s infinite}
+#boot-splash .bs-word{position:absolute;left:0;right:0;top:46.3vh;text-align:center;white-space:nowrap;font:300 3.7vh SamsungOne,"Segoe UI",Arial,sans-serif;letter-spacing:2.41vh;text-indent:2.41vh;color:#ecedf0}
+#boot-splash .bs-word span{display:inline-block;text-indent:0;animation:bs-letter 8s ease-in-out 2.6s infinite both}
+#boot-splash .bs-word .bs-tv{color:#989ba2}#boot-splash .bs-word .bs-tv:nth-child(6){margin-left:2.41vh}
+#boot-splash .bs-line{position:absolute;left:50%;top:53.33vh;width:13.9vh;height:1px;margin-left:-6.95vh;background:rgba(232,234,238,.42)}
+#boot-splash.boot-splash-out .bs-word,#boot-splash.boot-splash-out .bs-line{opacity:0;transition:opacity .45s cubic-bezier(.47,0,.53,1)}
+@keyframes bs-in{from{opacity:0}to{opacity:1}}
+@keyframes bs-breathe{0%,100%{opacity:1}50%{opacity:.84}}
+@keyframes bs-letter{from{opacity:1;}50%{opacity:.94}to{opacity:1}}
+.watching-tv #boot-splash{display:none}
+@media (prefers-reduced-motion:reduce){#boot-splash,#boot-splash *{animation:none!important;transition:none!important}}
+</style></head><body><div id="boot-splash" aria-hidden="true"><div class="bs-veil"></div><div class="bs-word"><span>Q</span><span>U</span><span>I</span><span>E</span><span>T</span><span class="bs-tv">T</span><span class="bs-tv">V</span></div><div class="bs-line"></div></div><div id="root"></div>
+<script>setTimeout(function(){var splash=document.getElementById('boot-splash');if(splash&&splash.parentNode)splash.parentNode.removeChild(splash);},12000);</script>
+<script type="module" src="/src/main.jsx"></script></body></html>

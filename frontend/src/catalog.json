@@ -1,0 +1,72 @@
+[
+  {
+    "Id": "org.tizen.netflix-app",
+    "Name": "Netflix",
+    "Icon": ""
+  },
+  {
+    "Id": "9Ur5IzDKqV.TizenYouTube",
+    "Name": "YouTube",
+    "Icon": ""
+  },
+  {
+    "Id": "org.tizen.primevideo",
+    "Name": "Prime Video",
+    "Icon": ""
+  },
+  {
+    "Id": "EYm8vc1St4.Philo",
+    "Name": "Philo",
+    "Icon": ""
+  },
+  {
+    "Id": "MCmYXNxgcu.DisneyPlus",
+    "Name": "Disney+",
+    "Icon": ""
+  },
+  {
+    "Id": "LBUAQX1exg.Hulu",
+    "Name": "Hulu",
+    "Icon": ""
+  },
+  {
+    "Id": "com.samsung.tv.aria-video",
+    "Name": "Apple TV",
+    "Icon": ""
+  },
+  {
+    "Id": "gzcc4LRFBF.Peacock",
+    "Name": "Peacock TV",
+    "Icon": ""
+  },
+  {
+    "Id": "PvWgqxV3Xa.YouTubeTV",
+    "Name": "YouTube TV",
+    "Icon": ""
+  },
+  {
+    "Id": "org.tizen.browser",
+    "Name": "Browser",
+    "Icon": ""
+  },
+  {
+    "Id": "rJyOSqC6Up.CBSAllAccess",
+    "Name": "Paramount+",
+    "Icon": ""
+  },
+  {
+    "Id": "Ob3XhAVMu6.amcplus",
+    "Name": "AMC+",
+    "Icon": ""
+  },
+  {
+    "Id": "XtU8fQk2gN.ESPN",
+    "Name": "ESPN",
+    "Icon": ""
+  },
+  {
+    "Id": "5b8c3eb16b.BeamCTVDev",
+    "Name": "HBO Max",
+    "Icon": ""
+  }
+]

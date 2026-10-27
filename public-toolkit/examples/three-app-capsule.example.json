@@ -1,0 +1,251 @@
+{
+  "schema": "tvkit-capsule/1",
+  "profileId": "UN43U8000FBXZA-1300.8-armv7l-tizen9",
+  "provenance": "owner-device-backup",
+  "device": {
+    "model": "UN43U8000FBXZA",
+    "firmware": "1300.8",
+    "arch": "armv7l",
+    "osName": "Tizen",
+    "osVersion": "9",
+    "deviceIdSha256": "e2740cffc41d9e5cd23407cd7326b9c9b50c4051c9c2cc8e43aa04ac1aa33721"
+  },
+  "packages": [
+    {
+      "packageId": "org.example.alpha",
+      "installRoot": "/opt/usr/apps/org.example.alpha",
+      "payload": {
+        "file": "payload/org.example.alpha.tar",
+        "sha256": "de2cf8a26eee9086ad34dca46552b87d22676a2e80a0b4cfad1ddd3cff320d87",
+        "size": 10240
+      },
+      "xattrManifest": {
+        "file": "xattrs/org.example.alpha.json",
+        "sha256": "5b8f9111b4e168852d73a1c2ef99270600485f170730579768f80e71e38b81e6",
+        "size": 1225
+      },
+      "entries": [
+        {
+          "path": ".",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "bin",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "bin/app",
+          "kind": "file",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 488,
+          "size": 33,
+          "sha256": "5bf178258e651389697c8c673f1a858f8b5013d1a8418270400b89f57a3a86cf"
+        },
+        {
+          "path": "current",
+          "kind": "symlink",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 511,
+          "linkTarget": "bin"
+        },
+        {
+          "path": "res",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "res/strings.txt",
+          "kind": "file",
+          "uid": 0,
+          "gid": 0,
+          "mode": 420,
+          "size": 31,
+          "sha256": "606bec69acca3ea249c75eeaccf0e1fc48ba63ed8cb4d56b4ee0dc6b026e67cb"
+        }
+      ]
+    },
+    {
+      "packageId": "org.example.bravo",
+      "installRoot": "/opt/usr/apps/org.example.bravo",
+      "payload": {
+        "file": "payload/org.example.bravo.tar",
+        "sha256": "b4027cd6ae882c097af8c0bbbc999463f57489782f9607750f7e4ed1d6e41c5f",
+        "size": 10240
+      },
+      "xattrManifest": {
+        "file": "xattrs/org.example.bravo.json",
+        "sha256": "809180860713a835c48eda85022d4e7c9758b94df97322324c2343df77b8e523",
+        "size": 1225
+      },
+      "entries": [
+        {
+          "path": ".",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "bin",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "bin/app",
+          "kind": "file",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 488,
+          "size": 33,
+          "sha256": "ebc0ba364ba4f97a6f102881cfedc15cc8539caa928a90d6208e34ba542c9916"
+        },
+        {
+          "path": "current",
+          "kind": "symlink",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 511,
+          "linkTarget": "bin"
+        },
+        {
+          "path": "res",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "res/strings.txt",
+          "kind": "file",
+          "uid": 0,
+          "gid": 0,
+          "mode": 420,
+          "size": 31,
+          "sha256": "bc30d833f4c79cea80bd78f13608c27b5f81cdbb2c76316d4ea074cda34a21fe"
+        }
+      ]
+    },
+    {
+      "packageId": "org.example.charlie",
+      "installRoot": "/opt/usr/apps/org.example.charlie",
+      "payload": {
+        "file": "payload/org.example.charlie.tar",
+        "sha256": "2b6e536fe0e93b5cb5300b9d2300e28aedbd2031131fe850ef6fcb823f85d35c",
+        "size": 10240
+      },
+      "xattrManifest": {
+        "file": "xattrs/org.example.charlie.json",
+        "sha256": "2914af2e2d406ae08e7d80ce82eabc3dc030fd6c4dbe0b1a20d68ef0f371234d",
+        "size": 1227
+      },
+      "entries": [
+        {
+          "path": ".",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "bin",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "bin/app",
+          "kind": "file",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 488,
+          "size": 35,
+          "sha256": "ebe66f25391a0a2e713d3bbc1a10a3c12bbc42be04da68422723fe51b5c02088"
+        },
+        {
+          "path": "current",
+          "kind": "symlink",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 511,
+          "linkTarget": "bin"
+        },
+        {
+          "path": "res",
+          "kind": "directory",
+          "uid": 5001,
+          "gid": 100,
+          "mode": 493
+        },
+        {
+          "path": "res/strings.txt",
+          "kind": "file",
+          "uid": 0,
+          "gid": 0,
+          "mode": 420,
+          "size": 33,
+          "sha256": "d6b90e88192c6d4849d75f05ab702377c380a959743a39846c084ec9f991486f"
+        }
+      ]
+    }
+  ],
+  "registryChanges": [
+    {
+      "appId": "org.example.alpha",
+      "fields": {
+        "app_disable": {
+          "before": "false",
+          "applied": "true"
+        },
+        "app_onboot": {
+          "before": "true",
+          "applied": "false"
+        }
+      }
+    },
+    {
+      "appId": "org.example.bravo",
+      "fields": {
+        "app_disable": {
+          "before": "0",
+          "applied": "1"
+        }
+      }
+    }
+  ],
+  "systemKeyChanges": [
+    {
+      "key": "db/appfw/startup_appid",
+      "type": "String",
+      "original": "org.example.viewer",
+      "expectedCurrent": "Example2026.Launcher",
+      "originalSha256": "9f6d294eb76c0f85a866cabeb66e5ec3086139a4001904bced29a1dd6601c32f",
+      "expectedCurrentSha256": "f4533d3afece4fa99b132994c633427b41ad4002ad8f97e75641ce3a9e231f03"
+    },
+    {
+      "key": "db/appfw/home_appid",
+      "type": "String",
+      "original": "org.example.home",
+      "expectedCurrent": "Example2026.Launcher",
+      "originalSha256": "63e6de8e38ee2a38b7c485cefd9f2478a27a47e833e1ef23c96b997844be304c",
+      "expectedCurrentSha256": "f4533d3afece4fa99b132994c633427b41ad4002ad8f97e75641ce3a9e231f03"
+    }
+  ],
+  "ourPackages": [
+    {
+      "packageId": "Example2026.Launcher"
+    }
+  ]
+}

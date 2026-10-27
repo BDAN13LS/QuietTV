@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quiettv-mcp"
+version = "0.1.0"
+description = "Local stdio MCP server for one owner-configured Quiet TV: status, Home, remote keys, app launch, diagnostics and fresh screen capture."
+readme = "README.md"
+requires-python = ">=3.11"
+# Licence is a parent-repository decision; docs/LICENSING.md carries the MIT proposal.
+dependencies = [
+    "mcp>=2.3,<3",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+]
+
+[project.scripts]
+quiettv-mcp = "quiettv_mcp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
