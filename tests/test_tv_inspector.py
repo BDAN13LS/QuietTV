@@ -23,6 +23,7 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parent.parent
 TOOL = REPO / "tools" / "tv-inspect"
@@ -76,6 +77,21 @@ class CleanupRefused(Exception):
 
 def _norm(path) -> str:
     return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+
+def _canon(path) -> str:
+    """Canonical form for comparing locations: resolves links and Windows 8.3 short-name aliases."""
+    return os.path.normcase(os.path.realpath(os.fspath(path)))
+
+
+def _parent_escape(base: Path, below: str) -> str:
+    """A lexical `..` path from base up to the filesystem root and back down to `below`.
+
+    Needs no relative-path computation, so it works when base and the fixtures are on different volumes
+    (os.path.relpath raises ValueError there)."""
+    anchor = Path(os.path.abspath(base)).anchor
+    depth = len(Path(os.path.abspath(base)).relative_to(anchor).parts)
+    return str(base) + os.sep + os.sep.join([".."] * depth) + os.sep + below.lstrip("/\\")
 
 
 def _is_reparse(path: str) -> bool:
@@ -662,12 +678,22 @@ class CleanupGuards(_CleanupFixture):
 
     def test_traversal_refused(self):
         self._sentinel(self.outside / "t")
-        via_bin = str(TOOL / "bin" / "x") + os.sep + os.path.relpath(self.outside / "t", TOOL / "bin" / "x")
+        via_bin = _parent_escape(TOOL / "bin" / "x", "sentinel-escape")
         for target in (via_bin, str(TOOL / "bin" / "x") + "/../y", str(TOOL / "bin" / ".." / "bin" / "y"),
                        str(TOOL / "bin" / "y" / ".."), "tools/tv-inspect/bin/x/../../..",
                        str(TOOL / "bin" / "x" / "obj") + "\\..\\..\\..\\Program.cs"):
             with self.subTest(target=target):
                 self._refused(target, "traversal")
+
+    def test_parent_escape_helper_is_volume_independent(self):
+        # Control for the fixture: the traversal path must not depend on os.path.relpath, which raises
+        # ValueError across Windows volumes (CI: temp on C:, checkout on D:).
+        base = TOOL / "bin" / "x"
+        with mock.patch("os.path.relpath", side_effect=ValueError("path is on mount 'C:', start on mount 'D:'")):
+            escape = _parent_escape(base, "sentinel-escape")
+        self.assertIn(os.sep + "..", escape)
+        self.assertEqual(os.path.normpath(escape), os.path.join(Path(os.path.abspath(base)).anchor, "sentinel-escape"))
+        self._refused(escape, "traversal")
 
     def test_leaf_link_refused(self):
         copy = self._copy_dir("cg-leaf")
@@ -786,8 +812,18 @@ class CleanupGuardOff(_CleanupFixture):
         target, kw = self._scenario_ancestor_link()
         weak = _weakened(self, [_G_CHAIN, _G_RESOLVED], ["    pass", "    pass"])
         calls = self._reached(weak, target, **kw)
-        resolved = _norm(os.path.realpath(calls[0]))
-        self.assertTrue(resolved.startswith(_norm(self.outside) + os.sep), f"expected an outside target, got {resolved}")
+        resolved = _canon(calls[0])
+        self.assertTrue(resolved.startswith(_canon(self.outside) + os.sep), f"expected an outside target, got {resolved}")
+
+    def test_canonical_comparison_handles_short_name_alias(self):
+        # Control: an 8.3 alias of the outside folder and its long form compare equal only when BOTH sides
+        # are canonicalised, and a sibling that merely shares a prefix is never "inside".
+        long_form, alias = "/lng/runneradmin/tmp/sentinel", "/lng/RUNNER~1/tmp/sentinel"
+        table = {alias + "/proj/obj": long_form + "/proj/obj", alias: long_form}
+        with mock.patch("os.path.realpath", side_effect=lambda p: table.get(os.fspath(p), os.fspath(p))):
+            resolved, outside = _canon(alias + "/proj/obj"), _canon(alias)
+            self.assertTrue(resolved.startswith(outside + os.sep))
+            self.assertFalse(_canon(long_form + "x/proj").startswith(outside + os.sep))
 
     def test_guard_off_inner_link_reaches_delete(self):
         target, kw = self._scenario_inner_link()

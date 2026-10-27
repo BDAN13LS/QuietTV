@@ -263,8 +263,8 @@
     },
     {
       "path": "tests/test_tv_inspector.py",
-      "size": 63371,
-      "sha256": "b4bf2089fcb293d1c03678a1cb1301fd246f52e8bf99651989999f4d3c9dac2b"
+      "size": 65510,
+      "sha256": "341f167ae3ab5aa3575d0a2b760c81b9df4421989f6ba13764e20e511420f4c9"
     },
     {
       "path": "tests/test_widget_bridge.py",
