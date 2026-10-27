@@ -13,8 +13,8 @@
     },
     {
       "path": "README.md",
-      "size": 9237,
-      "sha256": "99e16008dcccb02ad042070eafa792fd63b8adbe10aaef0608fe4cf3a5b2c34c"
+      "size": 9836,
+      "sha256": "60423c7672bf59eb6d2815052c7fcaed141795cb913423564dba538abf6b7ea3"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
@@ -113,8 +113,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 5759,
-      "sha256": "5e6acba354aa849cf89e5e0603d4df6b1626cfa77422bc7e60ea8a1e8c95aaab"
+      "size": 5837,
+      "sha256": "60f82975e46d805a9d54f2ba82479a331659d95eb382b59d8d7089d62fc361c3"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -1035,6 +1035,11 @@
       "path": "tools/xattr-backup/XattrBackup.csproj",
       "size": 514,
       "sha256": "c24d6d7b9579cf4ae84c085aa3416e9010cb1e317fcc02a5513094d32c6ddf49"
+    },
+    {
+      "path": "docs/CLEANUP-STATUS.md",
+      "size": 4296,
+      "sha256": "b2fe7ca9aa3cbe31ce2d2f2adb574babc745c66ba9977627ec45d141d829c1e9"
     }
   ],
   "excluded": [
@@ -1125,8 +1130,8 @@
       "reason": "Owner backups, keys and stock payloads. Never exported."
     },
     {
-      "path": "docs/ (all but docs/screenshots/)",
-      "reason": "Session notes about the owner's TV, network and home. Not public documentation. docs/screenshots/ ships when present, after the same scans."
+      "path": "docs/ (except docs/screenshots/ and docs/CLEANUP-STATUS.md)",
+      "reason": "Private session notes remain excluded; only explicitly reviewed cleanup status and screenshots are published."
     },
     {
       "path": "run_root.py, root_compat.py, receive_backup.py, tools/sdb-tunnel-client.cjs",
@@ -1138,5 +1143,5 @@
     }
   ],
   "absentOptional": [],
-  "note": "Developer preview source only, integrated from toolkit positive allowlist and git-tracked MCP source; both privacy checks passed. No private history, stock payloads, credentials or build output."
+  "note": "Public source integrated from explicit reviewed exports. No private history, stock payloads, credentials or build output. Launcher verified on the test TV; public setup and recovery tools remain in development."
 }

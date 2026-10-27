@@ -70,6 +70,7 @@
   ],
   "includeIfPresent": [
     "README.md",
+    "docs/CLEANUP-STATUS.md",
     "docs/screenshots/"
   ],
   "requireMarker": [
@@ -106,8 +107,8 @@
       "reason": "Owner backups, keys and stock payloads. Never exported."
     },
     {
-      "path": "docs/ (all but docs/screenshots/)",
-      "reason": "Session notes about the owner's TV, network and home. Not public documentation. docs/screenshots/ ships when present, after the same scans."
+      "path": "docs/ (except docs/screenshots/ and docs/CLEANUP-STATUS.md)",
+      "reason": "Private session notes about the owner's TV, network and home are excluded. Only the explicit cleanup status document and screenshots ship, after the same scans."
     },
     {
       "path": "run_root.py, root_compat.py, receive_backup.py, tools/sdb-tunnel-client.cjs",
