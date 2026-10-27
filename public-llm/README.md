@@ -60,8 +60,9 @@ The examples below use the Windows form `.venv\Scripts\quiettv-mcp`; on macOS/Li
 The wizard asks, in order:
 
 1. the TV model code and software version (TV: Settings > Support > About This TV);
-2. the TV's IP address and MAC address (Settings > Network > Network Status). Use the MAC the TV reports for the
-   network it is on: every call compares it with the MAC the TV itself reports, and refuses on a mismatch;
+2. the TV's IP address and MAC address (Settings > Network > Network Status). The MAC must equal the address the
+   TV's identity endpoint reports as `wifiMac`: every call compares the two and refuses on a mismatch, and
+   `doctor --online` confirms it;
 3. **the control key**: give the absolute path of your existing key file, or leave it empty and type the key at a
    hidden prompt; setup then writes `control.key` next to the config with owner-only permissions. The key is
    never accepted as a command-line argument or environment variable and never stored in the config;
@@ -114,6 +115,10 @@ forms were checked against the local `--help` of Claude Code 2.1.310 and codex-c
 clients and other versions are untested; if your client takes stdio MCP servers, the same command and arguments
 should apply, but nothing here confirms it.
 
+In PowerShell, a client installed through npm may resolve to a `.ps1` shim (`Get-Command codex` shows which), and
+PowerShell can drop the bare `--` when calling one. Use the `.cmd` shim instead (`codex.cmd mcp add ...`), run the
+command from cmd or Git Bash, or merge the TOML fragment.
+
 Then ask your client to call `tv_capabilities` (no device traffic) and `tv_status` (identity-checked) to confirm
 the connection.
 
@@ -156,8 +161,9 @@ Off by default; existing configs are unchanged. To turn it on, answer `y` in set
 
 **A sent packet is not a woken TV.** The result says `requested: true, awake_verified: false`. It may not wake
 the TV at all: the TV must allow network power-on (on Samsung TVs settings such as Network Standby or Power On
-with Mobile, whose names vary by model and firmware), support differs between Wi-Fi and Ethernet, and an unplugged
-TV cannot wake. Wait about 15 seconds, then run `tv_status` (or `run status`) to confirm. Wake has not been
+with Mobile, whose names vary by model and firmware), and an unplugged TV cannot wake. Support differs between
+Wi-Fi and Ethernet: the packet carries `tv.mac`, the identity-checked `wifiMac`, so a TV on Ethernet whose wired
+adapter has a different MAC may ignore it. Wait about 15 seconds, then run `tv_status` (or `run status`) to confirm. Wake has not been
 verified on hardware by this release.
 
 ```
