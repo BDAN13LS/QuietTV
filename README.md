@@ -62,7 +62,7 @@ Claude may refuse privileged device work, and provider policies vary. The older 
 
 Fork the repository, open a pull request, let the GitHub-hosted offline checks run, then wait for maintainer review. Hardware changes need tested evidence at the exact commit SHA. Do not run untrusted pull-request code on your personal TV or PC.
 
-Start with **[public-llm/community/CONTRIBUTING.md](public-llm/community/CONTRIBUTING.md)**. Merge remains maintainer-only; branch protection is still pending.
+Start with **[public-llm/community/CONTRIBUTING.md](public-llm/community/CONTRIBUTING.md)**. Main requires passing offline/privacy checks and code-owner review before contributor changes merge. The sole maintainer retains an administrator override.
 
 ## Licence
 
