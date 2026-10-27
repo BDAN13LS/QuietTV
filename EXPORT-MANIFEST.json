@@ -13,8 +13,8 @@
     },
     {
       "path": "README.md",
-      "size": 4246,
-      "sha256": "6ce9ba9222161e87e2f1ad5526000056674e83fdf0a3813568c2e33bfcd881e2"
+      "size": 7246,
+      "sha256": "a5f36bb5eafce7c254614cddd7b8f1affb3003f7511c59c8c8106ddcbaf9ffab"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
@@ -35,6 +35,11 @@
       "path": ".github/PULL_REQUEST_TEMPLATE.md",
       "size": 1489,
       "sha256": "bc881ead38e996c90ad76a137ce539a63aeb25c84e6cb6604f7247f379ef0473"
+    },
+    {
+      "path": "docs/CONSUMER-INSTALL-DESIGN-2026-10-27.md",
+      "size": 13681,
+      "sha256": "174e1fdb81c7e221e800a77ed08e63539d5984ccd1d1ca89e6bdb4fa0344ff89"
     },
     {
       "path": "frontend/index.html",
@@ -167,6 +172,11 @@
       "sha256": "cf8f2cd338f326612489fb84026692d5d4e8be432db9a3fd0dc85e6dc8113bb7"
     },
     {
+      "path": "docs/drafts/README-consumer.md",
+      "size": 7164,
+      "sha256": "fa29c88476ed6368adbb0d8245040df30398ae726391e330b4a94bab0f229471"
+    },
+    {
       "path": "docs/screenshots/home-day.png",
       "size": 2274930,
       "sha256": "d7fe98b4e50eb85ad7d11344ef1ee1d193c8a7059ee096e9d5662272046c4e2e"
@@ -175,6 +185,11 @@
       "path": "docs/screenshots/home-night.png",
       "size": 2058793,
       "sha256": "49249d25bfcd453878f07a02ba7279c787b87c50b9f94f0409a001988dfcf258"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-27-consumer-install.md",
+      "size": 15904,
+      "sha256": "5b3e25baa4a4a678c1c632b6f1c23d35d35632382bacac480baae548ddb452d5"
     },
     {
       "path": "frontend/src/appearance.mjs",

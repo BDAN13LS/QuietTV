@@ -2,68 +2,143 @@
 
 # QuietTV
 
-A remote-first alternative launcher for Samsung Tizen TVs. QuietTV keeps the TV feeling like a TV: big artwork, clear focus, fast remote navigation, and the native apps you already use.
-
-[github.com/BDAN13LS/QuietTV](https://github.com/BDAN13LS/QuietTV)
+**A replacement launcher for Samsung TVs, built for privacy and speed.**
+QuietTV replaces your Samsung TV's Home screen with a fast, remote-first
+launcher. It also lets you choose optional Samsung tracking, ads, TV Plus,
+Bixby and bloat to remove. The planned installer needs no AI, subscription or coding. It uses
+owner-authorized root access for your exact model and firmware. Picture,
+sound, inputs, Settings, security, DRM, the app store and updates stay in
+place. Restoring what QuietTV changes is planned and is a required release
+gate. There is no self-installer for consumers today.
 
 ![QuietTV home screen in day mode with scenic mountain artwork, app row and recent apps](docs/screenshots/home-day.png)
 
 ![QuietTV home screen in night mode with dark scenic artwork, app row and recent apps](docs/screenshots/home-night.png)
 
-*Desktop renders of the current launcher at 1920×1080, using sample recent-app history. App availability varies by TV.*
+*Desktop renders of the current launcher at 1920×1080, using sample
+recent-app history. They are not photos of a TV. App availability varies by
+TV.*
 
-These are renders of the actual app, not hardware captures. They show layout and design; they do not prove that every feature works on a TV.
+## Compatibility
 
-## Developer preview
+| TV model | Firmware | Status |
+|---|---|---|
+| Samsung UN43U8000FBXZA (ARMv7, Tizen 9) | 1300.8 | Developer preview, one TV tested |
+| Anything else | — | **Not supported.** QuietTV refuses other models and firmware. |
 
-This is an early developer preview, not a universal root or firmware installer, and not a ready-to-use package for arbitrary TVs. The current private build is **2.0.18**, warm-installed on one TV.
+## Current status: developer preview
 
-Exact test hardware:
+- **Not ready for consumers yet.** There is no installer you can download
+  today.
+- On the one test TV: the launcher (2.0.18) is installed and
+  opens native apps, the input picker, picture and sound settings, and the
+  Store. Three optional payloads have been removed there: Guide, the
+  informational Security Center screen, and TV Plus.
+- **Not verified yet:** Store app updates actually installing, DRM playback
+  and HDMI video. IPTV picture is currently black, so IPTV will be
+  hidden or marked unavailable until fixed. A black gap at startup is
+  still unsolved. Memory savings have not been measured, and removing all
+  Samsung tracking has not been proven.
 
-- Samsung **UN43U8000FBXZA**
-- firmware **1300.8**
-- **ARMv7**, **Tizen 9**
+## How installing will work (planned, not available yet)
 
-No broader compatibility is claimed.
+1. Download **QuietTV Helper for Windows**. It checks its own signature, and
+   you install no Python, coding tools or AI.
+2. On the TV, use the remote to turn on **Developer Mode** and enter your
+   PC's address. Developer Mode lets your PC talk to the TV. It does not
+   change the TV by itself.
+3. In the Helper, **back up** your TV to your PC, NAS or USB stick. Stock
+   files are not removed and Home/startup is not changed until the backup
+   has been read back and checked.
+4. Choose root + launcher, then **Recommended cleanup** or items one by one.
+   You see exactly what will change, then approve it.
+5. Check Home, remote, Settings and inputs with your remote.
 
-## What it does
+You will also need to sign in to your own Samsung account once, for a
+certificate tied to your TV. Developer Mode and that certificate do not give
+root access; root comes from a separate step built for your exact model and
+firmware. Each owner gets their own keys, and nothing is shared.
 
-- **Scenic or simple home screen** with day, dusk and night art, or plain colours.
-- **Optional weather**, configured by the device owner.
-- **Recent apps** from local launch history, not a provider's continue-watching feed.
-- **Native app launches** with Home, input picker, picture/sound settings and the Samsung Store retained.
-- **Preserved native core** so settings, input, audio, network, update and security dependencies still work. Cleanup is limited to verified optional payloads, not a blanket removal of Samsung software.
+**Type a URL into the TV browser?** That is the goal. The first planned
+version uses the TV browser as a *screen* for the Helper on your PC, on the
+same network. Whether a browser page can install root and QuietTV on stock
+firmware by itself is **not yet proven or ruled out**, and we won't claim it
+until it is shown working on a real TV. Opening a QuietTV page never changes
+your TV by itself.
 
-## Status and known limits
+## Cleanup and restore (planned)
 
-Verified on the tested TV: Store catalogue/open and Home. Actual Store app update installs, DRM playback and HDMI video are **not verified**.
-
-- **IPTV picture is currently black on the tested TV** even though decoding metadata is present. This is an open bug; playback is not claimed to work.
-- **Startup black gap:** not solved. No boot-speed claims are made.
-- App availability varies by TV.
-
-## Install packages
-
-The public LLM install package lives in **[public-llm/README.md](public-llm/README.md)**. It exposes read-only status plus allowlisted controls and fresh screenshots, with no arbitrary shell access. Private owner configuration and signing credentials are not shipped.
-
-The toolkit in **[public-toolkit/README.md](public-toolkit/README.md)** validates fetched backup capsules with a pinned hash and device binding, and builds offline restore plans. Its live transport adapter is **not implemented**, so automatic setup and restore **APPLY refuses and changes nothing**.
-
-This preview is not a ready-to-run universal root or firmware installer. Read the package documentation and understand the risks before touching a TV you own.
+- Every item shows what it does, what depends on it, and whether it can be
+  restored.
+- Results are reported plainly: **removed**, **disabled**, **kept**,
+  **held** (needed by something else, such as updates) or **failed**.
+- **Restore individual** puts back one item. **Restore Samsung** is meant
+  to undo QuietTV's changes, removing QuietTV itself last. It will only be
+  offered once it has been proven on hardware.
+- **Rescue** is a separate restore tool kept on your PC. It needs your home
+  network to reach the TV, but not the internet, the QuietTV launcher or its installed control service. If the TV's firmware changes and Rescue's access method
+  no longer works, Rescue tells you; it cannot promise to fix every failure.
+- Removing something from the TV's own menu later needs a verified backup of
+  that exact item, either already on your PC or reachable at that moment.
+  Otherwise **Remove** is greyed out and tells you why. The launcher itself
+  works without your PC switched on.
+- Holding firmware auto-updates is a separate choice you opt into, with the
+  trade-off explained. App updates stay on.
 
 ## Backups and privacy
 
-Keep backups of your own device **off the TV**, on your own PC, NAS or private storage. Do not fetch someone else's Samsung payloads. This repository does not ship stock images, keys or tokens.
+Your backup stays **off the TV**, on storage you control (planned: encrypted
+with your own passphrase). QuietTV never uploads your backup, account
+details, certificates or serial numbers. We publish our own source, builds,
+model profiles and checksums. We do not host Samsung firmware or Samsung
+apps. Generic, exact-version components might be published later, but only
+with verified permission, a clean scan and proven compatibility. A link to
+Samsung's official firmware is not a restore guarantee.
 
-## LLM-assisted work
+## FAQ
 
-Claude may refuse privileged device work, and provider policies vary. The older 4.6 model was not tested, and no model is guaranteed to help. Nothing here is intended to circumvent model or provider safeguards. Human CLI and offline tools are available without an LLM.
+**Is this a factory reset?** No. Factory reset, Reset Smart Hub, Samsung's
+USB firmware update and QuietTV restore are different things. Samsung notes
+that a full factory reset changes the TV's device ID, and nothing promises it
+brings back removed files. QuietTV restore puts back what QuietTV changed,
+from your own backup.
+
+**Can I go back to older Samsung firmware?** [Samsung says firmware downgrade is not supported](https://developer.samsung.com/smarttv/develop/faq/device-information-and-firmware.html). QuietTV does not flash firmware.
+
+**Does it stop all tracking?** We report which known Samsung services we
+removed or turned off. That does not prove zero telemetry, and it does not
+cover streaming apps you install.
+
+**Will it make my TV faster?** We will publish measured storage and memory
+numbers, with the method used. Until then we make no claim.
+
+**My TV is a different model.** Not supported. QuietTV refuses rather than
+guesses.
+
+**What if my backup was made after other changes?** It is labelled a
+"current-state" backup. It cannot restore anything removed before it was
+taken.
+
+## Installation roadmap
+
+Read the [consumer install design](docs/CONSUMER-INSTALL-DESIGN-2026-10-27.md)
+and the [phased implementation plan](docs/superpowers/plans/2026-10-27-consumer-install.md).
+These describe planned work, not an installer available today.
 
 ## Contributing
 
-Fork the repository, open a pull request, let the GitHub-hosted offline checks run, then wait for maintainer review. Hardware changes need tested evidence at the exact commit SHA. Do not run untrusted pull-request code on your personal TV or PC.
-
-Start with **[public-llm/community/CONTRIBUTING.md](public-llm/community/CONTRIBUTING.md)**. Main requires passing offline/privacy checks and code-owner review before contributor changes merge. The sole maintainer retains an administrator override.
+Fork, open a pull request, let the offline checks run, and wait for review.
+Hardware claims need evidence at the exact commit. See
+[public-llm/community/CONTRIBUTING.md](public-llm/community/CONTRIBUTING.md).
 
 ## Licence
 
-There is no repository-wide open-source licence yet. Licence selection and third-party provenance are pending, so do not assume the whole repository is under one licence. Component licences are recorded in **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)**.
+No repository-wide licence has been chosen yet. Component licences are in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## For developers using AI assistants (optional)
+
+You never need AI for install, use or restore. If you want to drive a test
+TV from an AI client, see the optional MCP package in
+[public-llm/README.md](public-llm/README.md). Models may refuse device
+work; the plain command line is always available.
