@@ -71,6 +71,7 @@
   "includeIfPresent": [
     "README.md",
     "docs/CLEANUP-STATUS.md",
+    "docs/INSTALL-OPTIONS.md",
     "docs/screenshots/"
   ],
   "requireMarker": [
