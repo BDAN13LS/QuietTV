@@ -133,8 +133,8 @@
     },
     {
       "path": "tests/test_public_host_source.py",
-      "size": 27751,
-      "sha256": "64339be5db96b8030ecf8ee0711db1ecf866fa9cc2b9a68f2d5d5f9ab2428d72"
+      "size": 28000,
+      "sha256": "805493b31b461931bc471822b0c5f015f3f7007d18f8971f801714d48b7faba6"
     },
     {
       "path": "tests/test_public_toolkit_audit.py",

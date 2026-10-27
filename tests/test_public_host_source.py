@@ -272,7 +272,10 @@ class BuildScriptCleanupGuards(unittest.TestCase):
 
     def setUp(self):
         import tempfile
-        self.outside = Path(tempfile.mkdtemp(prefix="quiettv-sentinel-"))
+        # Relative traversal fixtures must share the checkout's volume; hosted
+        # Windows runners commonly put TEMP on C: and the checkout on D:.
+        self.outside = Path(tempfile.mkdtemp(prefix="quiettv-sentinel-", dir=HOST.parent))
+        self.assertEqual(self.outside.drive.casefold(), HOST.drive.casefold())
         self.sentinels: list[Path] = []
         self.junctions: list[Path] = []
         self.copies: list[Path] = []
