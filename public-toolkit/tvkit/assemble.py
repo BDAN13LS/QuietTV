@@ -22,7 +22,7 @@ from typing import Any, Mapping
 from . import strictjson as sj
 from .capsule import (
     CAPSULE_SCHEMA, MANIFEST_NAME, PROVENANCE, Capsule, CapsuleError,
-    entries_from_payload, system_key_record, validate,
+    entries_from_payload, require_capsule1_profile, system_key_record, validate,
 )
 from .paths import is_identifier
 from .profile import MATCH_FIELDS, Profile, device_id_sha256, match_device
@@ -36,6 +36,8 @@ def _sha256_bytes(data: bytes) -> str:
 
 def assemble(spec_path: str | Path, profile: Profile, device_facts: Mapping[str, str],
              out_dir: str | Path) -> Capsule:
+    # capsule/1 cannot bind build or region: refuse before reading anything or creating a folder.
+    require_capsule1_profile(profile)
     spec_file = Path(spec_path)
     base = spec_file.parent
     try:

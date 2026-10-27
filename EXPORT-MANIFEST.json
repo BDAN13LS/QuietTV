@@ -13,13 +13,13 @@
     },
     {
       "path": "README.md",
-      "size": 7246,
-      "sha256": "a5f36bb5eafce7c254614cddd7b8f1affb3003f7511c59c8c8106ddcbaf9ffab"
+      "size": 7648,
+      "sha256": "cfa70ea255c84264496ff42e809fb391590c946de2bf1917af644f9921d84ab2"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
-      "size": 18689,
-      "sha256": "82cb5649e754c006c10823c0df5f2ad49545bfcd7abd5ba3fcdf274de52e6046"
+      "size": 19508,
+      "sha256": "54e5ca2507d28e0b3ba4ac17e64acbfb0a501ff28d27c317ac7fc1df44bdd1df"
     },
     {
       "path": ".github/CODEOWNERS",
@@ -88,8 +88,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 3272,
-      "sha256": "f3f8acbcd5345c7c21fdd2718ccd8cbd26b0fa0a2e4164f74dc9695bd7853504"
+      "size": 3570,
+      "sha256": "6d3402e1af9c182110c0a5ddda5b4f420271f15a188da1111a5c2866cfdf3ee2"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -98,8 +98,8 @@
     },
     {
       "path": "public-toolkit/README.md",
-      "size": 14395,
-      "sha256": "9abf5f8acb4d064acf46ec5456c646592cca24ece1ac773a8ca40e679b949d4b"
+      "size": 14854,
+      "sha256": "055c42122f8e67e8f0a977ba358630732289fe51cfeac689391f98fe42a88cae"
     },
     {
       "path": "public-toolkit/Setup.ps1",
@@ -112,14 +112,44 @@
       "sha256": "0e7d4bbef5afe0f7b6273abe63a4b47f99464489b4d7489174a8d61d35f33785"
     },
     {
+      "path": "rescue/main.py",
+      "size": 24240,
+      "sha256": "37054eed6eeb5c798486382eaf058be3586189dc2e2f0704776406a9ddbc717a"
+    },
+    {
+      "path": "rescue/README.md",
+      "size": 3644,
+      "sha256": "f9867a588fb0c11b7a805c524c5422fe789e22ca082f0005933c56fa9a301d63"
+    },
+    {
+      "path": "rescue/__init__.py",
+      "size": 101,
+      "sha256": "1b33e00bd36b26d2fdde1457577f29c18609409be9536789ef4f77422dfa8e02"
+    },
+    {
       "path": "tests/test_optional_app_plan.py",
       "size": 21215,
       "sha256": "f41dd9c1eeb6940b50b941bc7385a8edc69f4c9d431e671490f99961bc6fbf73"
     },
     {
+      "path": "tests/test_public_toolkit_audit.py",
+      "size": 5630,
+      "sha256": "82cd8b30a2f9ff4c1374a0ab1282f95f8a2019365a5cb5369a92f61ea14d5258"
+    },
+    {
+      "path": "tests/test_public_toolkit_backup.py",
+      "size": 17453,
+      "sha256": "1518e37f7ede26e084f378fcafe61190705783dcb77ddc5b5ffeccfa897abb92"
+    },
+    {
       "path": "tests/test_public_toolkit_capsule.py",
       "size": 19953,
       "sha256": "bd1a9cee9b494a5a6d2f6f4fb04a18a5f55699b0b0c673ca24a9edab72bfcb8a"
+    },
+    {
+      "path": "tests/test_public_toolkit_catalogue.py",
+      "size": 18168,
+      "sha256": "c43a6ec0ef90d1cdb4e31f3dc420a0dc2ba1a9f270f82f9d6159e19d731d4e1a"
     },
     {
       "path": "tests/test_public_toolkit_export.py",
@@ -142,9 +172,39 @@
       "sha256": "4e95d04e0513987d8aaae966739b4b2ebf0eea8107ed3c70e7252ce1c0fb151b"
     },
     {
+      "path": "tests/test_public_toolkit_journal.py",
+      "size": 22064,
+      "sha256": "b9ef9cc772dedf44a16adc92790890af5419a23977b622a01f7f938b65585d38"
+    },
+    {
       "path": "tests/test_public_toolkit_plan.py",
       "size": 14553,
       "sha256": "1402c23d196e89f5eac5e6f4d3975cae7836f33f314b677c7151f1b24ba5c7ae"
+    },
+    {
+      "path": "tests/test_public_toolkit_profile_v2.py",
+      "size": 6386,
+      "sha256": "d0a352695efca6195a9bf7dccea1e8e5bf08407f6af2a212f8a5c2502d1f86b3"
+    },
+    {
+      "path": "tests/test_public_toolkit_states.py",
+      "size": 3495,
+      "sha256": "9ac4b8a67c596dc6a52ce297eb1ade7d6bf20f922c189f155dc0ef7dce0e20c9"
+    },
+    {
+      "path": "tests/test_public_toolkit_v2_integration.py",
+      "size": 15860,
+      "sha256": "2de21dcba65bf14fefa626bce989123ff63908c8eba272d92a5495b58e901d98"
+    },
+    {
+      "path": "tests/test_rescue_independence.py",
+      "size": 5259,
+      "sha256": "bc492bab8a4954d0b7715980b2baa090108d648688c44712cba5d8f5cefba8de"
+    },
+    {
+      "path": "tests/test_rescue_refusals.py",
+      "size": 27076,
+      "sha256": "bd41ab0d5b338a193248f3b66dc20cdc692fb7a5713dc225b724cbfbaf3ac7d7"
     },
     {
       "path": "tools/plan_optional_apps.py",
@@ -168,8 +228,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 3074,
-      "sha256": "cf8f2cd338f326612489fb84026692d5d4e8be432db9a3fd0dc85e6dc8113bb7"
+      "size": 3156,
+      "sha256": "18236242ba75e20c7b7b10654781bcbd9b0e9d86933cc9cdc620354cdd73df27"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -547,6 +607,21 @@
       "sha256": "06ad359bdf40f51fe241716142b8a164bc0d9112e63236cf23bea183103bec4b"
     },
     {
+      "path": "public-toolkit/docs/D0-BROWSER-PROBE.md",
+      "size": 1746,
+      "sha256": "28163a39cb1adabf9adde5b807d3b3cf270289841f3d43b2405b9e3a56e958c9"
+    },
+    {
+      "path": "public-toolkit/docs/D1-ENGINE.md",
+      "size": 12270,
+      "sha256": "425259d907c4e7dae7c1af3fd06af2b30da83854e09e61bbfd0859f22cf9cf27"
+    },
+    {
+      "path": "public-toolkit/docs/D2-READBACK.md",
+      "size": 8385,
+      "sha256": "e9555f2adae2be5570b3eb4d1ee422f318b2429252b46fcd7ef6fb5406fdd808"
+    },
+    {
       "path": "public-toolkit/examples/three-app-assemble-spec.example.json",
       "size": 1550,
       "sha256": "aa10b545c77fe9b11ff30db0691a16687037ea9e8c760904d19657b5f4527779"
@@ -563,18 +638,33 @@
     },
     {
       "path": "public-toolkit/tvkit/assemble.py",
-      "size": 5469,
-      "sha256": "ebe6f3b9d609d510f30cdbf9108febdb1217668b91b6020138b997578d558973"
+      "size": 5633,
+      "sha256": "f8fa0158903858aa856bb7a7f9f98369e29cd28e2e249cc13c9e46aef19ab426"
+    },
+    {
+      "path": "public-toolkit/tvkit/audit.py",
+      "size": 6091,
+      "sha256": "6ea27149f6d76a080e1d628add483aee4a96cfaa28bbb4224419978157e1cf65"
+    },
+    {
+      "path": "public-toolkit/tvkit/backup.py",
+      "size": 13107,
+      "sha256": "77497225a77d922d0408f56aba209e9310808e582a6f360d82d6da8f7e70abc6"
     },
     {
       "path": "public-toolkit/tvkit/capsule.py",
-      "size": 34275,
-      "sha256": "3e61facd097ee81079dcac484b66d26b56866b4c4122f47f1ffc832fe760e58f"
+      "size": 35056,
+      "sha256": "76a2fc97048e0f229fc26587f80b20e3d95077adc5c8a8cfb7cb401d35c9078d"
+    },
+    {
+      "path": "public-toolkit/tvkit/catalogue.py",
+      "size": 19800,
+      "sha256": "05dc057acdfc8810509d3a3774aeb9e1adc11039e9dfde2c9ec4725c8888cfb2"
     },
     {
       "path": "public-toolkit/tvkit/cli.py",
-      "size": 14012,
-      "sha256": "ecd2ebd1a4ca493428ff60e88b8a2426f4971b1d0b31168315911c804a2bc2c8"
+      "size": 14533,
+      "sha256": "4008ba398587417dd93f92dc505e7212230ab99d6cc9d87e9bf4d448bf24c677"
     },
     {
       "path": "public-toolkit/tvkit/config.py",
@@ -597,6 +687,11 @@
       "sha256": "19c4abb0b7a6c08fce2e263f695d8647de51a416cda2fda4edf1f563b22c62fc"
     },
     {
+      "path": "public-toolkit/tvkit/journal.py",
+      "size": 16945,
+      "sha256": "1c048303543dd4a8f8ffd8fd6cad35c39ec9dcbde1a69bf62101a0a7f31cac7d"
+    },
+    {
       "path": "public-toolkit/tvkit/paths.py",
       "size": 2451,
       "sha256": "390f55082435602a8d6fb5aa80b866ca233f348237d5014305cf3ea61e01b3a2"
@@ -613,8 +708,13 @@
     },
     {
       "path": "public-toolkit/tvkit/profile.py",
-      "size": 6411,
-      "sha256": "d79e4e7ee4524fae19d8aa9ff3093bd2982abeccaddafb3913381e505d3511f4"
+      "size": 8153,
+      "sha256": "156572fa24325a742280c2b4dd37eadf533a7b47e798b2ea60b62aac71366fd0"
+    },
+    {
+      "path": "public-toolkit/tvkit/states.py",
+      "size": 3769,
+      "sha256": "1be5931914433b6b1943149ff8f4f8a8d742bdfc9154358b8c1c69ef942b8336"
     },
     {
       "path": "public-toolkit/tvkit/strictjson.py",
@@ -630,6 +730,21 @@
       "path": "public-toolkit/tvkit/__init__.py",
       "size": 327,
       "sha256": "0bc82e037500484dc7675c7dc1c84ba08c2ccb646bdaf55d84f6ac6586409768"
+    },
+    {
+      "path": "tests/fixtures/consumer/components.json",
+      "size": 4970,
+      "sha256": "aa274ae0d6f1ee96daa46483820c5d22a1b131c4b7977101f8c634104d080f00"
+    },
+    {
+      "path": "tests/fixtures/consumer/inventory.json",
+      "size": 1619,
+      "sha256": "c9d6856a296c3a4d26c5d5faa9e885dd685cd497ef724607085d3512fe608d2e"
+    },
+    {
+      "path": "tests/fixtures/consumer/profile-v2.json",
+      "size": 1103,
+      "sha256": "59aab4cdf64e1b6bf143daa7d609a5a42f52fa47b15fe95e6538e4c78817a987"
     },
     {
       "path": "tools/xattr-backup/Program.cs",

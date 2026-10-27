@@ -1,0 +1,62 @@
+{
+  "schema": "tvkit-profile/2",
+  "profileId": "SYNTHETIC-QTV0001-0000.1-armv7l-tizen9",
+  "match": {
+    "model": "SYNTHETIC-QTV0001",
+    "firmware": "0000.1",
+    "arch": "armv7l",
+    "osName": "Tizen",
+    "osVersion": "9",
+    "firmwareBuild": "SYNTHETIC-BUILD-0000.1",
+    "region": "SYNTHETIC-REGION"
+  },
+  "installRoots": [
+    "/opt/usr/apps",
+    "/usr/apps"
+  ],
+  "registry": {
+    "table": "package_app_info",
+    "key": "app_id",
+    "fields": [
+      "app_disable",
+      "app_onboot",
+      "app_autorestart"
+    ],
+    "values": [
+      "true",
+      "false",
+      "1",
+      "0"
+    ]
+  },
+  "systemKeys": [
+    "db/appfw/startup_appid",
+    "db/appfw/home_appid"
+  ],
+  "protectedIdSubstrings": [
+    "setting",
+    "hdmi",
+    "audio",
+    "sound",
+    "volume",
+    "network",
+    "wifi",
+    "wlan",
+    "ethernet",
+    "bluetooth",
+    "security",
+    "csfs",
+    "firmware",
+    "update",
+    "store",
+    "webengine",
+    "chromium",
+    "ewk",
+    "drm",
+    "tv-viewer",
+    "source"
+  ],
+  "manualPrerequisites": [
+    "Synthetic test profile. Matches no real TV."
+  ]
+}

@@ -19,6 +19,14 @@ guessed at.
 
 ## What works today (PC side, tested offline)
 
+The current source also contains the [D1 engine contracts](docs/D1-ENGINE.md),
+[D2 backup readback gate](docs/D2-READBACK.md) and the separate
+[restore-only Rescue engine](../rescue/README.md). These are offline,
+tested engineering slices. No device adapter ships, no cached root method
+ships, and no full restore has been performed through them on a real TV.
+The [browser compatibility test](docs/D0-BROWSER-PROBE.md) proves LAN page
+exchange only.
+
 | Command | What it does |
 |---|---|
 | `doctor` | Checks Python, the built-in profile, your config, and lists the manual prerequisites. |

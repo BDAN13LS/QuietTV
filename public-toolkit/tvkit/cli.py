@@ -18,13 +18,13 @@ from typing import Sequence
 from . import __version__
 from . import strictjson as sj
 from .assemble import assemble, bundle
-from .capsule import Capsule, CapsuleError, validate
+from .capsule import Capsule, CapsuleError, require_capsule1_profile, validate
 from .config import PROJECT_REPO_URL, TEMPLATE, ConfigError, load_config, unconfigured
 from .export import ExportError, build_report, load_allowlist, load_deny_values, write_export
 from .fetch import FetchError, fetch
 from .frontend_export import TransformError, load_spec
 from .plan import Plan, restore_plan, setup_plan
-from .profile import ProfileError, builtin_profiles, get_profile, parse_device_facts
+from .profile import ProfileError, builtin_profiles, get_profile, match_device, parse_device_facts
 from .transport import TRANSPORTS, StepFailed, TransportUnavailable, get_transport, run_plan
 
 EXIT_OK, EXIT_REFUSED, EXIT_USAGE, EXIT_NO_ADAPTER = 0, 1, 2, 3
@@ -49,6 +49,15 @@ def _facts(path: str | None):
         return parse_device_facts(sj.load_file(path, 64 * 1024))
     except sj.StrictJsonError as exc:
         raise ProfileError(str(exc)) from exc
+
+
+def _checked_facts(profile, path: str | None):
+    """Device facts for a capsule command: refused unless they match the profile exactly."""
+    require_capsule1_profile(profile)
+    facts = _facts(path)
+    if facts is not None:
+        match_device(profile, facts)
+    return facts
 
 
 def _print_plan(plan: Plan, as_json: bool) -> None:
@@ -119,16 +128,18 @@ def cmd_profiles(args) -> int:
 
 
 def cmd_capsule_validate(args) -> int:
-    capsule = validate(args.capsule, _profile(args), _facts(args.device_facts))
+    profile = _profile(args)
+    capsule = validate(args.capsule, profile, _checked_facts(profile, args.device_facts))
     print(_summary(capsule))
     return EXIT_OK
 
 
 def cmd_capsule_assemble(args) -> int:
-    facts = _facts(args.device_facts)
+    profile = _profile(args)
+    facts = _checked_facts(profile, args.device_facts)
     if facts is None:
         raise ProfileError("--device-facts is required to bind the capsule to the device")
-    capsule = assemble(args.spec, _profile(args), facts, args.out)
+    capsule = assemble(args.spec, profile, facts, args.out)
     print(_summary(capsule))
     return EXIT_OK
 
@@ -157,7 +168,7 @@ def _build_plan(kind: str, capsule: Capsule, profile, args) -> Plan:
 
 def cmd_plan(args) -> int:
     profile = _profile(args)
-    capsule = validate(args.capsule, profile, _facts(args.device_facts))
+    capsule = validate(args.capsule, profile, _checked_facts(profile, args.device_facts))
     print(_summary(capsule), file=sys.stderr)
     _print_plan(_build_plan(args.kind, capsule, profile, args), args.json)
     return EXIT_OK
@@ -165,8 +176,9 @@ def cmd_plan(args) -> int:
 
 def cmd_apply(args) -> int:
     profile = _profile(args)
+    require_capsule1_profile(profile)
     if not args.apply:
-        capsule = validate(args.capsule, profile, _facts(args.device_facts))
+        capsule = validate(args.capsule, profile, _checked_facts(profile, args.device_facts))
         print(_summary(capsule), file=sys.stderr)
         _print_plan(_build_plan(args.kind, capsule, profile, args), False)
         print("DRY RUN: pass --apply with an implemented --transport to run this plan.")
@@ -175,6 +187,7 @@ def cmd_apply(args) -> int:
     validate(args.capsule, profile, None)
     transport = get_transport(args.transport)
     facts = parse_device_facts(dict(transport.read_device_facts()))
+    match_device(profile, facts)
     capsule = validate(args.capsule, profile, facts)
     plan = _build_plan(args.kind, capsule, profile, args)
     completed = run_plan(plan, transport, capsule_verified=capsule.payload_verified,

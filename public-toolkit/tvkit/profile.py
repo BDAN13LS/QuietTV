@@ -3,6 +3,11 @@
 Matching is exact string equality on every field. There is no prefix,
 substring, case-folding or "close enough" match: an unknown TV is rejected,
 never guessed at.
+
+``tvkit-profile/2`` adds two match fields, ``firmwareBuild`` and ``region``.
+Version 1 profiles stay readable and match on the version 1 fields only.
+``MATCH_FIELDS`` is unchanged on purpose: the capsule/1 device block is
+built from it.
 """
 
 from __future__ import annotations
@@ -10,13 +15,18 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from . import strictjson as sj
 from .paths import check_absolute_posix
 
 PROFILE_SCHEMA = "tvkit-profile/1"
+PROFILE_SCHEMA_V2 = "tvkit-profile/2"
 MATCH_FIELDS = ("model", "firmware", "arch", "osName", "osVersion")
+V2_FIELDS = ("firmwareBuild", "region")
+MATCH_FIELDS_V2 = MATCH_FIELDS + V2_FIELDS
+SCHEMA_MATCH_FIELDS = {PROFILE_SCHEMA: MATCH_FIELDS, PROFILE_SCHEMA_V2: MATCH_FIELDS_V2}
 DEVICE_ID_DOMAIN = "tvkit-device-id/1\n"
 PLACEHOLDER_PREFIX = "<CONFIGURE"
 PROFILES_DIR = Path(__file__).resolve().parent.parent / "profiles"
@@ -38,6 +48,18 @@ class Profile:
     system_keys: tuple[str, ...]
     protected_substrings: tuple[str, ...]
     manual_prerequisites: tuple[str, ...]
+    schema: str = PROFILE_SCHEMA
+
+    def __post_init__(self) -> None:
+        # A read-only view, so a caller cannot weaken a cached profile by editing its match.
+        object.__setattr__(self, "match", MappingProxyType(dict(self.match)))
+
+    @property
+    def match_fields(self) -> tuple[str, ...]:
+        """Fixed per schema, never taken from the match mapping itself."""
+        if self.schema not in SCHEMA_MATCH_FIELDS:
+            raise ProfileError("profile schema is not supported")
+        return SCHEMA_MATCH_FIELDS[self.schema]
 
     def is_protected(self, identifier: str) -> bool:
         lowered = identifier.lower()
@@ -63,11 +85,13 @@ def parse_profile(data: Any) -> Profile:
             ("schema", "profileId", "match", "installRoots", "registry",
              "systemKeys", "protectedIdSubstrings", "manualPrerequisites"),
         )
-        if top["schema"] != PROFILE_SCHEMA:
-            raise ProfileError(f"profile schema must be {PROFILE_SCHEMA}")
+        schema = top["schema"]
+        if type(schema) is not str or schema not in SCHEMA_MATCH_FIELDS:
+            raise ProfileError(f"profile schema must be {PROFILE_SCHEMA} or {PROFILE_SCHEMA_V2}")
+        fields = SCHEMA_MATCH_FIELDS[schema]
         profile_id = sj.require_str(top["profileId"], "profile.profileId")
-        match = sj.require_object(top["match"], "profile.match", MATCH_FIELDS)
-        for field in MATCH_FIELDS:
+        match = sj.require_object(top["match"], "profile.match", fields)
+        for field in fields:
             value = sj.require_str(match[field], f"profile.match.{field}")
             if is_placeholder(value) or value != value.strip():
                 raise ProfileError(f"profile.match.{field} is not a concrete value")
@@ -96,7 +120,7 @@ def parse_profile(data: Any) -> Profile:
         )
         return Profile(
             profile_id=profile_id,
-            match={field: match[field] for field in MATCH_FIELDS},
+            match={field: match[field] for field in fields},
             install_roots=roots,
             registry_table=sj.require_str(registry["table"], "profile.registry.table"),
             registry_key=sj.require_str(registry["key"], "profile.registry.key"),
@@ -111,6 +135,7 @@ def parse_profile(data: Any) -> Profile:
             system_keys=system_keys,
             protected_substrings=protected,
             manual_prerequisites=prereqs,
+            schema=schema,
         )
     except sj.StrictJsonError as exc:
         raise ProfileError(str(exc)) from exc
@@ -143,17 +168,27 @@ def get_profile(profile_id: str) -> Profile:
 
 
 def parse_device_facts(data: Any) -> dict[str, str]:
-    """Facts the owner's transport read from the TV: the match fields plus deviceId."""
+    """Facts the owner's transport read from the TV: the match fields plus deviceId.
+
+    ``firmwareBuild`` and ``region`` are optional here (version 1 facts stay
+    valid); a version 2 profile refuses facts that lack them in ``match_device``.
+    """
     try:
-        facts = sj.require_object(data, "device facts", MATCH_FIELDS + ("deviceId",))
-        return {key: sj.require_str(facts[key], f"device facts.{key}") for key in facts}
+        facts = sj.require_object(data, "device facts", MATCH_FIELDS + ("deviceId",), V2_FIELDS)
+        result = {key: sj.require_str(facts[key], f"device facts.{key}") for key in facts}
     except sj.StrictJsonError as exc:
         raise ProfileError(str(exc)) from exc
+    for key in V2_FIELDS:
+        if key in result and (is_placeholder(result[key]) or result[key] != result[key].strip()):
+            raise ProfileError(f"device facts.{key} is not a concrete value")
+    return result
 
 
 def match_device(profile: Profile, facts: Mapping[str, str]) -> None:
     """Exact equality on every field. Raises naming the field, never the value."""
-    for field in MATCH_FIELDS:
+    for field in profile.match_fields:
+        if field not in profile.match:
+            raise ProfileError(f"profile {profile.profile_id} has no {field} to match; refusing")
         if facts.get(field) != profile.match[field]:
             raise ProfileError(
                 f"device {field} does not exactly match profile {profile.profile_id}; refusing"
