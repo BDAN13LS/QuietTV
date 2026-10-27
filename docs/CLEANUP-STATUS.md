@@ -39,7 +39,8 @@ First batch (23):
 `com.samsung.tv.wakeup-engine-bixby`, `org.tizen.voice-app`.
 
 Later batch (3):
-- `emanual1`, the Guide.
+
+- `25emanual1`, the Guide.
 - `com.samsung.tv.SecurityCenter`, **information screen only**; the core
   security components were kept.
 - `HEPsqFNie0`, the standalone TV Plus app.
@@ -56,6 +57,15 @@ This is disk storage. It is **not RAM**. There is no valid before/after RAM
 baseline, so no memory saving is claimed, and no further safe RAM-removal
 candidate has been established.
 
+## Memory (RAM)
+
+A read-only snapshot of the owner's TV on 27 October 2026 showed
+MemAvailable 504,268 KiB (about 492 MiB) of MemTotal 1,612,368 KiB (about
+1,575 MiB). That is one momentary available-memory reading. It is **not** a
+before/after saving. Several streaming-app processes remain resident, so app
+lifecycle should be evaluated before any more deletion. No further safe
+removal candidate is confirmed.
+
 ## Blocked, not removed
 
 - **11 services** were blocked and were inactive after the previous cold boot.
@@ -65,6 +75,7 @@ candidate has been established.
 ## Held (whole package kept)
 
 Kept pending proof about updates and dependencies:
+
 - `com.samsung.tv.ai-discovery-service`, because an enabled
   download-content sibling depends on it.
 - `org.tizen.voice-client`, because an enabled stt-client sibling depends on it.
