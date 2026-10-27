@@ -347,7 +347,17 @@ def _parse_fileref(value: Any, label: str) -> FileRef:
     return FileRef(name, obj["sha256"], size)
 
 
-def _parse_entries(value: Any, label: str, install_root: str) -> tuple[Entry, ...]:
+def _is_approved_external(external_links: Mapping[str, str] | None, path: str, target: Any) -> bool:
+    """True only for an exact (entry path, link target) pair a recovery/2 caller approved.
+
+    capsule/1 passes ``None`` and never exempts anything. The mapping is built by
+    ``tvkit.recovery2`` from its trusted reference policy, never from the manifest.
+    """
+    return external_links is not None and path in external_links and external_links[path] == target
+
+
+def _parse_entries(value: Any, label: str, install_root: str,
+                   external_links: Mapping[str, str] | None = None) -> tuple[Entry, ...]:
     items = sj.require_list(value, label, max_items=MAX_ENTRIES)
     entries: dict[str, Entry] = {}
     for position, item in enumerate(items):
@@ -373,7 +383,7 @@ def _parse_entries(value: Any, label: str, install_root: str) -> tuple[Entry, ..
         )
         if kind == "file" and not is_sha256(entry.sha256):
             raise CapsuleError(f"{where}.sha256 must be 64 lowercase hex characters")
-        if kind == "symlink":
+        if kind == "symlink" and not _is_approved_external(external_links, path, entry.link_target):
             sj.require_str(entry.link_target, f"{where}.linkTarget")
             if _link_escapes(path, entry.link_target, install_root):
                 raise CapsuleError(f"{where} is a symbolic link that escapes the package root")
@@ -393,6 +403,8 @@ def _parse_entries(value: Any, label: str, install_root: str) -> tuple[Entry, ..
     kinds = {path: entry.kind for path, entry in entries.items()}
     links = {path: entry.link_target for path, entry in entries.items() if entry.kind == "symlink"}
     for path in links:
+        if _is_approved_external(external_links, path, links[path]):
+            continue  # only this exact link; any other link walking through it still escapes
         if _resolved_link_escapes(path, kinds, links, install_root):
             raise CapsuleError(f"{label} has a symbolic link that escapes the package root through other links")
     return tuple(entries[path] for path in sorted(entries))
@@ -521,10 +533,33 @@ def _parse_manifest(data: Any, profile: Profile) -> Capsule:
     if is_placeholder(device["deviceIdSha256"]) or not is_sha256(device["deviceIdSha256"]):
         raise CapsuleError("capsule.device.deviceIdSha256 is missing or a placeholder")
 
+    packages, ids = _parse_packages(profile, top["packages"])
+    ours = _parse_our_packages(profile, top["ourPackages"], ids)
+    return Capsule(
+        profile_id=profile.profile_id,
+        device={name: device[name] for name in MATCH_FIELDS + ("deviceIdSha256",)},
+        packages=tuple(packages),
+        registry_changes=_parse_registry(profile, top["registryChanges"]),
+        system_key_changes=_parse_system_keys(profile, top["systemKeyChanges"]),
+        our_packages=tuple(ours),
+    )
+
+
+def _parse_packages(
+    profile: Profile,
+    value: Any,
+    external_links_for: Mapping[str, Mapping[str, str]] | None = None,
+) -> tuple[list[Package], set[str]]:
+    """The ``packages`` list, shared by capsule/1 and recovery/2.
+
+    ``external_links_for`` maps a package id to its exact approved external
+    links (recovery/2 only); capsule/1 passes nothing, so every escaping link
+    is refused exactly as before.
+    """
     packages: list[Package] = []
     ids: set[str] = set()
     files: set[str] = set()
-    for position, item in enumerate(sj.require_list(top["packages"], "packages", max_items=MAX_PACKAGES)):
+    for position, item in enumerate(sj.require_list(value, "packages", max_items=MAX_PACKAGES)):
         where = f"packages[{position}]"
         obj = sj.require_object(item, where, ("packageId", "installRoot", "payload", "xattrManifest", "entries"))
         package_id = obj["packageId"]
@@ -542,11 +577,15 @@ def _parse_manifest(data: Any, profile: Profile) -> Capsule:
             if ref.file.casefold() in files:
                 raise CapsuleError(f"{where} reuses a file another entry already names")
             files.add(ref.file.casefold())
-        entries = _parse_entries(obj["entries"], f"{where}.entries", install_root)
+        external = (external_links_for or {}).get(package_id)
+        entries = _parse_entries(obj["entries"], f"{where}.entries", install_root, external)
         packages.append(Package(package_id, install_root, payload, xattrs, entries))
+    return packages, ids
 
+
+def _parse_our_packages(profile: Profile, value: Any, ids: set[str]) -> list[str]:
     ours: list[str] = []
-    for position, item in enumerate(sj.require_list(top["ourPackages"], "ourPackages", max_items=8)):
+    for position, item in enumerate(sj.require_list(value, "ourPackages", max_items=8)):
         where = f"ourPackages[{position}]"
         obj = sj.require_object(item, where, ("packageId",))
         if not is_identifier(obj["packageId"]) or profile.is_protected(obj["packageId"]):
@@ -555,15 +594,7 @@ def _parse_manifest(data: Any, profile: Profile) -> Capsule:
             raise CapsuleError(f"{where}.packageId conflicts with a restored package")
         ids.add(obj["packageId"].casefold())
         ours.append(obj["packageId"])
-
-    return Capsule(
-        profile_id=profile.profile_id,
-        device={name: device[name] for name in MATCH_FIELDS + ("deviceIdSha256",)},
-        packages=tuple(packages),
-        registry_changes=_parse_registry(profile, top["registryChanges"]),
-        system_key_changes=_parse_system_keys(profile, top["systemKeyChanges"]),
-        our_packages=tuple(ours),
-    )
+    return ours
 
 
 # --------------------------------------------------------------------------
@@ -704,6 +735,34 @@ def verify_payload(package: Package, source: CapsuleSource) -> int:
 
 # --------------------------------------------------------------------------
 # Top level
+
+
+def read_manifest_bytes(source: CapsuleSource) -> bytes:
+    """The raw ``capsule.json`` bytes, size-limited. Shared with ``tvkit.recovery2``."""
+    if MANIFEST_NAME not in source.names():
+        raise CapsuleError("capsule has no capsule.json")
+    if source.size(MANIFEST_NAME) > MAX_CAPSULE_MANIFEST_BYTES:
+        raise CapsuleError("capsule.json is too large")
+    with source.open(MANIFEST_NAME) as handle:
+        return handle.read(MAX_CAPSULE_MANIFEST_BYTES + 1)
+
+
+def manifest_schema(path: str | Path) -> str:
+    """The exact ``schema`` string of a capsule folder or bundle, for dispatch.
+
+    ``open_source`` decides only folder versus bundle; the schema string alone
+    decides the validator (``tvkit.recovery2.validate_any``). This reads and
+    strictly parses the manifest and nothing else. :func:`validate` stays
+    capsule/1 only and refuses every other schema.
+    """
+    source = open_source(path)
+    try:
+        data = _wrap("capsule.json", sj.loads, read_manifest_bytes(source))
+    finally:
+        source.close()
+    if not isinstance(data, dict) or type(data.get("schema")) is not str:
+        raise CapsuleError("capsule.json has no schema string")
+    return data["schema"]
 
 
 def validate(

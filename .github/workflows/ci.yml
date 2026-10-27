@@ -54,6 +54,10 @@ jobs:
           npm ci --ignore-scripts
           npm test
           npm run build
+      - name: Owner configuration and packaged widget checks
+        run: |
+          .venv/bin/python -m unittest discover -s tests -p 'test_owner_init.py' -q
+          .venv/bin/python -m unittest discover -s tests -p 'test_widget*.py' -q
 
   native-host:
     name: Native host build

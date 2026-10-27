@@ -35,12 +35,14 @@ export function dismissSplash(doc,instant,setTimer){
 }
 export function createBootHandoff(deps){
  let run=null;
- async function go({art,focused,reduced}){
+ // nativeEnabled:false (owner preview) never contacts the native splash: no fetch, no retry; only the HTML splash leaves.
+ async function go({art,focused,reduced,nativeEnabled=true}){
   const started=deps.now(),artResult=await waitForArt(art,deps);
   const focusStart=deps.now();while(!focused()&&deps.now()-focusStart<LIMITS.focusMs)await deps.nextFrame();
   const hasFocus=!!focused();if(!hasFocus)deps.warn('Quiet TV signalled ready without spatial focus after '+LIMITS.focusMs+' ms');
   await deps.nextFrame();await deps.nextFrame();
   const readyMs=Math.round(deps.now()-started);
+  if(nativeEnabled===false){const splash=deps.dismiss(!!reduced);return {readyMs,art:artResult,focused:hasFocus,htmlSplash:splash,nativeInFront:false,signal:{ok:false,skipped:true,attempts:0}};}
   // Two splashes dissolving on top of each other would read as an uneven, late fade. If the native splash answers,
   // it is the one in front and does the dissolve, so the HTML copy underneath goes at once. With no answer within
   // nativeAnswerMs the HTML splash is the visible one and dissolves itself.

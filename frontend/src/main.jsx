@@ -8,7 +8,8 @@ import netflix from './assets/brand-netflix.svg';import youtube from './assets/b
 import iptv from './assets/iptv.svg';import dusk from './assets/cinematic-dusk.png';import day from './assets/cinematic-day.png';import night from './assets/cinematic-night.png';
 import {allowedAction,normalizeOrder,homeApps,homeFocus,recordRecent,searchApps,recentApps,SYSTEM_APPS} from './policy.mjs';
 import {startBootHandoff} from './boot-ready.mjs';
-import {launcherApps,initialSaved,uninstalledIds} from './launcher-apps.mjs';
+import {initialSaved,uninstalledIds} from './launcher-apps.mjs';
+import {resolveRuntimeApps} from './runtime-catalog.mjs';
 import {WALLPAPERS,COLORS,APPEARANCE_KEY,loadAppearance,storeAppearance,sunFor,resolveAppearance,msToNextMinute} from './appearance.mjs';
 import {validZip,loadWeatherSettings,loadWeatherCache,placeFor,placeLabel,dueForFetch,beginAttempt,refreshWeather,weatherView,weatherSun} from './weather.mjs';
 import './style.css';
@@ -20,7 +21,9 @@ const wallArt={day,dusk,night},weatherIcons={clear:Sun,'clear-night':Moon,partly
 const wallDetail={Day:'Bright daylight',Dusk:'Golden hour',Night:'Dimmed for evening'},capital=word=>word.charAt(0).toUpperCase()+word.slice(1);
 // Weather never gates the first paint or the boot hand-off: it starts after the hand-off or this delay, whichever is first.
 const WEATHER_START_MS=6000,weatherDeps={fetchFn:(url,options)=>fetch(url,options),now:()=>Date.now(),setTimer:(fn,ms)=>setTimeout(fn,ms),clearTimer:id=>clearTimeout(id)};
-const allApps=launcherApps(catalog);
+// An owner-generated list (window.QuietTVApps) replaces the compiled catalogue; a bad one gives an empty pool and a setup message.
+const runtime=resolveRuntimeApps({compiled:catalog,apps:window.QuietTVApps,config:window.QuietTVConfig});
+const allApps=runtime.apps;
 const defaultFavorites=[NETFLIX,YOUTUBE,APPLE,'org.tizen.primevideo','EYm8vc1St4.Philo',HBO];
 const liveIds=new Set(['quiet.iptv','EYm8vc1St4.Philo','PvWgqxV3Xa.YouTubeTV','ZmmGjO6VKO.slingtv','XtU8fQk2gN.ESPN']);
 const movieIds=new Set([NETFLIX,APPLE,'org.tizen.primevideo','MCmYXNxgcu.DisneyPlus','LBUAQX1exg.Hulu','gzcc4LRFBF.Peacock','3KA0pm7a7V.TubiTV','rJyOSqC6Up.CBSAllAccess','Ob3XhAVMu6.amcplus',HBO]);
@@ -82,22 +85,23 @@ function App(){
  const {ref,focusKey}=useFocusable({focusKey:'ROOT',trackChildren:true,saveLastFocusedChild:true,autoRestoreFocus:false});
  const apps=order.map(id=>allApps.find(a=>a.Id===id)).filter(a=>a&&uninstalled.indexOf(a.Id)<0);
  const recentlyOpened=recentApps(recent,apps,5);
- const homePool=apps.filter(a=>defaultFavorites.includes(a.Id)||favorites.includes(a.Id)||a.Id==='quiet.iptv');
+ const picked=apps.filter(a=>defaultFavorites.includes(a.Id)||favorites.includes(a.Id)||a.Id==='quiet.iptv'),homePool=picked.some(a=>a.Id!=='quiet.iptv')?picked:apps;
+ const navHome=list=>list.length?null:'nav-Home',homeKey=(last,list)=>navHome(list)||homeFocus(last,list);
  const first=homeApps(homePool,favorites,apps.some(a=>a.Id===HBO)?7:6);
  const now=time.getTime(),place=placeFor(weatherSettings.zip,weatherCache),sunAt=at=>sunFor(at,weatherSun(weatherCache,weatherSettings.zip,at),place);
  const look=resolveAppearance(appearance,now,sunAt(now)),weather=weatherView({...weatherSettings,cache:weatherCache,now});weatherRef.current={settings:weatherSettings,cache:weatherCache};
  const autoPhase=resolveAppearance('Auto',now,sunAt(now)).name,choiceFocus=WALLPAPERS.includes(appearance)?'wall-'+appearance:'color-'+appearance;
  const shown=page==='Movies'?apps.filter(a=>movieIds.has(a.Id)):page==='Live TV'?apps.filter(a=>liveIds.has(a.Id)):page==='Search'?searchApps(apps,query):apps;
- function open(next,restore=false){setDialog(false);setPage(next);setIndex(0);setPendingSwap(null);setMessage('');requestAnimationFrame(()=>setFocus(next==='Settings'?'setting-appearance':next==='Appearance'?choiceFocus:next==='Home'?homeFocus(restore?window.QuietTVLastAppFocus:null,first):next==='Inputs'?'nav-Home':next==='Search'?'key-A':'grid-'+(next==='Movies'?apps.filter(a=>movieIds.has(a.Id)):next==='Live TV'?apps.filter(a=>liveIds.has(a.Id)):apps)[0]?.Id));}
+ function open(next,restore=false){setDialog(false);setPage(next);setIndex(0);setPendingSwap(null);setMessage('');requestAnimationFrame(()=>setFocus(next==='Settings'?'setting-appearance':next==='Appearance'?choiceFocus:next==='Home'?homeKey(restore?window.QuietTVLastAppFocus:null,first):next==='Inputs'?'nav-Home':next==='Search'?'key-A':(l=>l.length?'grid-'+l[0].Id:'nav-Home')(next==='Movies'?apps.filter(a=>movieIds.has(a.Id)):next==='Live TV'?apps.filter(a=>liveIds.has(a.Id)):apps)));}
  function send(action){if(!allowedAction(action,allApps))return;window.QuietTVOutbox??=[];window.QuietTVOutbox.push(action);setMessage(action.type==='launch'?'Opening app…':'');}
  function select(app){
   if(page==='Favorites'){setFavorites(old=>old.includes(app.Id)?old.filter(id=>id!==app.Id):[...old,app.Id]);return;}
   if(page==='Arrange'){if(!pendingSwap){setPendingSwap(app.Id);setMessage('Choose the second app.');}else{setOrder(old=>{const next=[...old],a=next.indexOf(pendingSwap),b=next.indexOf(app.Id);[next[a],next[b]]=[next[b],next[a]];return next;});setPendingSwap(null);setMessage('App order saved.');}return;}
   setRecent(old=>recordRecent(old,app.Id,allApps));send({type:'launch',id:app.Id});
  }
- function cancelDialog(){setDialog(false);requestAnimationFrame(()=>setFocus(page==='Settings'?'setting-close':homeFocus(window.QuietTVLastAppFocus,first)));}
+ function cancelDialog(){setDialog(false);requestAnimationFrame(()=>setFocus(page==='Settings'?'setting-close':homeKey(window.QuietTVLastAppFocus,first)));}
  useEffect(()=>{if(page!=='Inputs')return;let canceled=false;setInputs([]);setInputsError('');const request=window.QuietTVGetInputs?window.QuietTVGetInputs():Promise.reject(Error('Input controls are available on the TV.'));request.then(list=>{if(canceled)return;setInputs(list);requestAnimationFrame(()=>{if(list.length)setFocus('source-'+list[0].type+'-'+list[0].number);});}).catch(error=>{if(!canceled)setInputsError(error.message);});return()=>{canceled=true;};},[page]);
- useEffect(()=>{window.QuietTVOutbox=[];setFocus('home-'+first[0].Id);const arm=setTimeout(()=>setWeatherArmed(true),WEATHER_START_MS);startBootHandoff({art:[...(look.art?[wallArt[look.art]]:[]),...first.map(app=>artFor(app.Id))],focused:()=>!!getCurrentFocusKey(),reduced:reduced()||!motion}).then(result=>{window.QuietTVBoot=result;setWeatherArmed(true);});
+ useEffect(()=>{window.QuietTVOutbox=[];setFocus(first.length?'home-'+first[0].Id:'nav-Home');const arm=setTimeout(()=>setWeatherArmed(true),WEATHER_START_MS);startBootHandoff({nativeEnabled:window.QuietTVConfig?.preview!==true,art:[...(look.art?[wallArt[look.art]]:[]),...first.map(app=>artFor(app.Id))],focused:()=>!!getCurrentFocusKey(),reduced:reduced()||!motion}).then(result=>{window.QuietTVBoot=result;setWeatherArmed(true);});
   // The clock and Auto wallpaper move on each minute boundary, and at once when the TV wakes or the page is shown again.
   let timer=null;const tick=()=>{setTime(new Date());timer=setTimeout(tick,msToNextMinute(Date.now()));};timer=setTimeout(tick,msToNextMinute(Date.now()));
   const wake=()=>{if(!document.hidden)setTime(new Date());};document.addEventListener('visibilitychange',wake);window.addEventListener('pageshow',wake);window.addEventListener('focus',wake);
@@ -128,6 +132,7 @@ function App(){
  <main ref={content} className={page==='Home'?'home-content'+(recentlyOpened.length?' has-recents':''):'library-content'}>
  {page==='Home'?<>
   {weather.status!=='off'&&<WeatherPanel view={weather}/>}
+  {runtime.error&&<p className="empty-state" role="alert">{runtime.error}</p>}
   <section className="home-apps"><h2>Your apps</h2><div className="app-row">{first.map(app=><Tile key={app.Id} app={app} prefix="home" onPress={select}/>)}</div></section>
   {recentlyOpened.length>0&&<section className="recent-section"><h2>Recently opened</h2><div className="recent-row">{recentlyOpened.map(app=><FocusButton key={app.Id} id={'recent-'+app.Id} className="recent-chip" label={'Open '+app.Name+' again'} onPress={()=>select(app)}><span className="recent-art"><img src={artFor(app.Id)} alt="" loading="lazy" onError={e=>{e.currentTarget.style.display='none';}}/></span><span>{app.Name}</span></FocusButton>)}</div></section>}
   <section className="quick-section"><h2>Your TV, your way</h2><div className="quick-row"><Shortcut id="quick-apps" Icon={Grid2X2} title="All your apps" detail={apps.length+' apps. One place.'} onPress={()=>open('Apps')}/><Shortcut id="quick-live" Icon={Tv} title="Live TV" detail="Your channels & streaming" onPress={()=>open('Live TV')}/><Shortcut id="quick-inputs" Icon={Plug} title="Connected devices" detail="HDMI & TV inputs" onPress={()=>open('Inputs')}/><Shortcut id="quick-settings" Icon={SlidersHorizontal} title="Picture & sound" detail="Fine-tune your screen" onPress={()=>send({type:'launch',id:SYSTEM_APPS.settings})}/></div></section>

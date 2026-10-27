@@ -86,3 +86,24 @@ test('index.html paints the splash before the bundle and removes it by itself if
  vm.runInNewContext(inline[0],{document:{getElementById:id=>id==='boot-splash'?el:null},setTimeout:(fn,ms)=>pending.push({fn,ms})});
  assert.equal(pending.length,1);assert.ok(pending[0].ms<=15000,'fail-open removal after '+pending[0].ms+' ms');pending[0].fn();assert.equal(el.gone,true);
 });
+
+test('legacy default still signals the native splash; nativeEnabled:true is the same',async()=>{
+ for(const extra of [{},{nativeEnabled:true}]){
+  const h=harness();const result=await h.settle(h.start({...ready,...extra}));
+  assert.equal(h.calls.length,1);assert.equal(result.nativeInFront,true);assert.equal(result.signal.ok,true);
+ }
+});
+test('nativeEnabled:false (preview) makes zero fetches, never retries, and still retires the HTML splash',async()=>{
+ const h=harness({fetchFn:()=>{throw Error('preview must not fetch');}});
+ const result=await h.settle(h.start({...ready,nativeEnabled:false}));
+ assert.equal(h.calls.length,0);assert.deepEqual(h.warnings,[]);
+ assert.deepEqual(result.signal,{ok:false,skipped:true,attempts:0});assert.equal(result.nativeInFront,false);assert.equal(result.htmlSplash,true);
+ assert.deepEqual(h.dismissed.map(d=>d.instant),[false],'HTML splash dissolves itself with motion on');assert.ok(h.dismissed[0].at<=40,'after art, focus and two frames');
+ const r=harness({fetchFn:()=>{throw Error('no');}});await r.settle(r.start({...ready,nativeEnabled:false,reduced:true}));
+ assert.deepEqual(r.dismissed.map(d=>d.instant),[true]);assert.equal(r.calls.length,0);
+ const f=harness({fetchFn:()=>{throw Error('no');}});await f.settle(f.start({...ready,nativeEnabled:false,focused:()=>false}));
+ assert.equal(f.calls.length,0,'still waits for the focus limit, still no fetch');
+});
+test('main.jsx passes nativeEnabled from the preview flag',()=>{
+ assert.match(readFileSync(new URL('../src/main.jsx',import.meta.url),'utf8'),/startBootHandoff\(\{nativeEnabled:window\.QuietTVConfig\?\.preview!==true,/);
+});

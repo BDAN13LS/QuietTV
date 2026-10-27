@@ -1,0 +1,19 @@
+{
+  "schema": "tvkit-external-ref-policy/1",
+  "profileId": "SYNTHETIC-QTV0001-0000.1-armv7l-tizen9",
+  "approvals": [
+    {
+      "packageId": "org.example.delta",
+      "linkPath": "bin/runtime",
+      "target": "/usr/bin/example-runtime",
+      "targetEvidence": {
+        "kind": "file",
+        "sha256": "09b2df669d38f856ff3c8f4828e7cefd0005f4ad4602b5659bb7be129e2b630a",
+        "size": 26,
+        "uid": 0,
+        "gid": 0,
+        "mode": 493
+      }
+    }
+  ]
+}

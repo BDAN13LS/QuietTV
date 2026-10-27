@@ -135,6 +135,21 @@ Developers can also build the [portable TV-side native host](launcher/host/READM
 Its temporary on-TV self-test passed; it is not a replacement installation
 or a complete launcher package.
 
+The [owner configuration generator and preview widget builder](launcher/widget/README.md)
+now produce an ordinary, separate TV app from the sanitized frontend and an
+owner's selected installed apps. A privately signed preview was installed
+and rendered on the test TV: Right moved focus and selecting YouTube opened
+YouTube. Home returned to the existing launcher; the preview was then
+uninstalled. This was a warm test, not a stock installation. The public builder
+produces an **unsigned** package; it does not root the TV, register Home or
+enable startup. Owner keys and signed packages are not published.
+
+The [recovery/2 format](public-toolkit/docs/RECOVERY2.md) validates exact
+device facts, approved external file references and individual startup
+fields. Its offline undo planner refuses changed values rather than
+overwriting them. There is still no live recovery/2 writer or complete
+consumer installer.
+
 ## Contributing
 
 Fork, open a pull request, let the offline checks run, and wait for review.

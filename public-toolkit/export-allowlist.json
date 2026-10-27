@@ -26,10 +26,21 @@
     "launcher/host/global.json",
     "launcher/host/host-config.example.json",
     "tools/build-public-host.ps1",
+    "helper/owner_init.py",
+    "helper/build_widget.py",
+    "launcher/widget/README.md",
+    "launcher/widget/config.xml.template",
+    "launcher/widget/quiettv-bridge.js",
+    "launcher/widget/tv-inputs.js",
+    "tests/test_owner_init.py",
+    "tests/test_widget_build.py",
+    "tests/test_widget_bridge.py",
     "tests/test_public_host_source.py",
     "tests/fixtures/consumer/profile-v2.json",
     "tests/fixtures/consumer/components.json",
     "tests/fixtures/consumer/inventory.json",
+    "tests/fixtures/recovery2/boot-policy.json",
+    "tests/fixtures/recovery2/external-policy.json",
     "tools/xattr-backup/Program.cs",
     "tools/xattr-backup/SelfTests.cs",
     "tools/xattr-backup/XattrBackup.csproj",
@@ -57,7 +68,7 @@
     },
     {
       "path": "app/",
-      "reason": "Private deployed host tree remains excluded. A reviewed portable source candidate is positively exported file-by-file under launcher/host/, with an offline build and self-tests; it is not an installer. The service, widget, owner configuration generator, root/signing and recovery integration are still release blockers."
+      "reason": "Private deployed host tree remains excluded. A reviewed portable source candidate is positively exported file-by-file under launcher/host/, with an offline build and self-tests; it is not an installer. Also exported file-by-file as offline SOURCE CANDIDATES with their tests: the unsigned preview widget (launcher/widget/: bridge, config.xml template, tv-inputs.js) and its owner-data generator and packager (helper/owner_init.py, helper/build_widget.py). They are NOT a production widget. RELEASE BLOCKERS remain: the on-boot service and loopback backend, per-owner signing, the signed install, default-Home/startup setup, root and recovery integration, and hardware proof."
     },
     {
       "path": "boot/",
