@@ -27,6 +27,11 @@ ships, and no full restore has been performed through them on a real TV.
 The [browser compatibility test](docs/D0-BROWSER-PROBE.md) proves LAN page
 exchange only.
 
+The [portable native host source](../launcher/host/README.md) and its
+offline build are now included too. The exact candidate passed its
+memory-only self-test on the test TV. This does not verify its live UI or
+provide a deployable widget/service, root acquisition, signing or installer.
+
 | Command | What it does |
 |---|---|
 | `doctor` | Checks Python, the built-in profile, your config, and lists the manual prerequisites. |
@@ -56,7 +61,7 @@ is listed in `export-allowlist.json` → `notExported`:
 
 | Missing | Why it is not here |
 |---|---|
-| `app/` (native .NET launcher host: `Program.cs`, `State.cs`, `RemoteGate.cs`, `WebFrontend.cs`, `Canvas.cs`, `Native.cs`, `IptvSession.cs`) | Device-side; not positively audited for a public build. Without it the frontend has no TV-side host. |
+| `app/` (private deployed native host) | A portable source candidate is included separately under `launcher/host/`. Its build/config/defaults are tested; service, widget, signing/root and installer integration remain absent. |
 | `boot/widget/` (registered Home widget: `config.xml`, `icon.png`, `bridge.js`, `home.js`, `tv-inputs.js`) | Device-side; `config.xml` names the owner and declares the excluded on-boot service. `bridge.js`/`home.js` only work against that service. |
 | `boot/widget/service/` and `boot/widget/payload/*.dll` | Privileged on-boot service and native payload. Never published. |
 | `iptv/` (IPTV player host and web app) | Not positively audited; bundles third-party scripts whose licences are not yet recorded. |

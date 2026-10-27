@@ -126,7 +126,7 @@ def test_ci_template_is_read_only_and_pinned():
     assert "pull_request_target" not in body and "secrets." not in body and "self-hosted" not in body
     assert re.findall(r"runs-on: (\S+)", body) == ["ubuntu-24.04", "ubuntu-24.04"]
     uses = re.findall(r"uses: (\S+)", body)
-    assert uses and all(re.fullmatch(r"actions/(checkout|setup-python|setup-node)@[0-9a-f]{40}", u) for u in uses)
+    assert uses and all(re.fullmatch(r"actions/(checkout|setup-python|setup-node|setup-dotnet)@[0-9a-f]{40}", u) for u in uses)
     assert body.count("persist-credentials: false") == body.count("actions/checkout@")
     names = re.findall(r"^    name: (.+)$", body, re.M)
     assert sorted(names) == ["Offline checks", "Public source guard"]

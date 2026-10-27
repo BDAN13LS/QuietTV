@@ -131,6 +131,10 @@ and [backup readback gate](public-toolkit/docs/D2-READBACK.md) have automated
 tests. A separate [Rescue engine](rescue/README.md) is also tested offline.
 These foundations do not yet install or restore a consumer TV.
 
+Developers can also build the [portable TV-side native host](launcher/host/README.md).
+Its temporary on-TV self-test passed; it is not a replacement installation
+or a complete launcher package.
+
 ## Contributing
 
 Fork, open a pull request, let the offline checks run, and wait for review.

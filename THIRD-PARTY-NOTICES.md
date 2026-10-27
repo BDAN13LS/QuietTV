@@ -8,8 +8,9 @@ The private native host's Home-key forwarding code was adapted from
 The upstream repository declares the
 [Unlicense](https://github.com/chris-ritsen/samsung-tv-root/blob/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b/LICENSE).
 The adaptation consumes Home and forwards other key events; it is not a
-kernel patch. The native host is not included in this developer-preview
-export yet. This attribution does not select a repository-wide licence
+kernel patch. The portable native source candidate is included under
+`launcher/host/`; the original deployed tree and installation services are
+not included. This attribution does not select a repository-wide licence
 for QuietTV.
 
 ## Frontend runtime packages

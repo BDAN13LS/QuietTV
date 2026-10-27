@@ -1,0 +1,13 @@
+{
+  "schema": "quiettv-host-config/1",
+  "runtimeRoot": "/home/owner/share/<OWNER-CHOSEN-FOLDER>/quiet-tv",
+  "ownerUid": 5001,
+  "ownAppId": "<PACKAGE_ID>.QuietTV",
+  "homeKeyCode": 63,
+  "observedInputPaths": ["/dev/input/event<N>"],
+  "remoteDeviceNames": [],
+  "remoteGrabEnabled": false,
+  "iptvEnabled": false,
+  "webUiEnabled": false,
+  "snapshotEnabled": false
+}

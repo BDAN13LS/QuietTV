@@ -1,0 +1,30 @@
+using System.Runtime.InteropServices;
+internal static class Native {
+ [DllImport("libelementary.so.1")] internal static extern int elm_init(int argc, IntPtr argv);
+ [DllImport("libelementary.so.1")] internal static extern IntPtr elm_win_add(IntPtr parent,string name,int type);
+ [DllImport("libelementary.so.1")] internal static extern void elm_win_borderless_set(IntPtr o,int value);
+ [DllImport("libelementary.so.1")] internal static extern void elm_win_prop_focus_skip_set(IntPtr o,int value);
+ [DllImport("libelementary.so.1")] internal static extern void elm_win_input_rect_set(IntPtr o,int x,int y,int w,int h);
+ [DllImport("libelementary.so.1")] internal static extern void elm_win_activate(IntPtr o);
+ [DllImport("libelementary.so.1")] internal static extern void elm_win_layer_set(IntPtr o,int layer);
+ [DllImport("libcapi-ui-efl-util.so.0")] internal static extern int efl_util_set_notification_window_level(IntPtr o,int level);
+ [DllImport("libevas.so.1")] internal static extern IntPtr evas_object_evas_get(IntPtr o);
+ [DllImport("libevas.so.1")] internal static extern IntPtr evas_object_rectangle_add(IntPtr canvas);
+ [DllImport("libevas.so.1")] internal static extern IntPtr evas_object_text_add(IntPtr canvas);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_text_font_set(IntPtr o,string font,int size);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_text_text_set(IntPtr o,string text);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_color_set(IntPtr o,int r,int g,int b,int a);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_move(IntPtr o,int x,int y);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_resize(IntPtr o,int w,int h);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_show(IntPtr o);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_hide(IntPtr o);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_focus_set(IntPtr o,int value);
+ [DllImport("libevas.so.1")] internal static extern void evas_object_event_callback_add(IntPtr o,int type,KeyCallback callback,IntPtr data);
+ [DllImport("libecore.so.1")] internal static extern IntPtr ecore_timer_add(double seconds,TimerCallback callback,IntPtr data);
+ [DllImport("libecore.so.1")] internal static extern void ecore_main_loop_begin();
+ [DllImport("libecore.so.1")] internal static extern void ecore_main_loop_quit();
+ [DllImport("libecore.so.1")] internal static extern IntPtr ecore_event_handler_add(int type,EventCallback callback,IntPtr data);
+ [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int EventCallback(IntPtr data,int type,IntPtr info);
+ [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void KeyCallback(IntPtr data,IntPtr canvas,IntPtr obj,IntPtr info);
+ [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int TimerCallback(IntPtr data);
+}
