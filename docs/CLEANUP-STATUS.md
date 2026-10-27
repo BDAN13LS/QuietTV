@@ -18,6 +18,12 @@ yet, and nothing here is a promise for other models or firmware.
 
 ## Removed: 27 payload trees
 
+The removed components cover Samsung analytics, targeted advertising,
+AI Companion and suggestions, Bixby and voice-assistant features, and
+automatic content recognition (ACR, identifying what is being watched).
+Guide and the standalone TV Plus app were also removed. This does not prove
+that every telemetry path in the remaining operating system is gone.
+
 | Batch | Count | Notes |
 |---|---|---|
 | Analytics | 1 | `com.samsung.tizen.samsung-analytics` |
@@ -76,9 +82,10 @@ removal candidate is confirmed.
 
 Kept pending proof about updates and dependencies:
 
-- `com.samsung.tv.ai-discovery-service`, because an enabled
-  download-content sibling depends on it.
-- `org.tizen.voice-client`, because an enabled stt-client sibling depends on it.
+- `com.samsung.tv.ai-discovery-service`, whose payload tree also contains the
+  enabled `com.samsung.tv.download-content` component.
+- `org.tizen.voice-client`, whose payload tree also contains the enabled
+  `org.tizen.stt-client` component.
 
 ## Deliberately kept
 
