@@ -61,6 +61,10 @@ TV.*
 - **No consumer self-installer yet.** There is no installer you can download
   today, and no live public restore writer. What is public so far is source
   and offline-tested building blocks (see the roadmap below).
+- **Backup engine implemented:** tested with simulated TV data, it binds a backup
+  to one TV, streams files, checks the final stored copy, and keeps owner backups
+  outside Git checkouts. A live TV reader and standalone restore writer are still
+  unfinished. See the [backup capture contract](public-toolkit/docs/D2-CAPTURE.md).
 - **Removed on the test TV:** a set of optional Samsung payloads, listed in
   [docs/CLEANUP-STATUS.md](docs/CLEANUP-STATUS.md) with what was kept and
   what was held back.

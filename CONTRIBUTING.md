@@ -34,7 +34,7 @@ go in `.github/public-binaries.txt` the same way. Nothing is exempted by folder 
 
 Fill in the pull-request template. Offline test output is always required.
 
-**Device-affecting changes** (anything that changes what is sent to the TV, the identity check, profiles, allowlists, capture handling or maintenance) also need the **hardware gate**: a maintainer runs the change on the supported TV at the **exact head commit SHA** and records an attestation (see `docs/HARDWARE-GATE.md`). Pushing again invalidates it. CI cannot do this for you; it never has access to a TV.
+**Device-affecting changes** (anything that changes what is sent to the TV, the identity check, profiles, allowlists, capture handling or maintenance) also need the **hardware gate**: a maintainer runs the change on the supported TV at the **exact head commit SHA** and records an attestation (see `public-llm/docs/HARDWARE-GATE.md`). Pushing again invalidates it. CI cannot do this for you; it never has access to a TV.
 
 ## Adding a device profile
 
