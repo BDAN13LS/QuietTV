@@ -332,15 +332,18 @@ def _stage_blob(captured: object, dest: Path, limit: int, what: str) -> Captured
     """
     if not isinstance(captured, CapturedStream):
         raise CaptureRefused(f"backend returned no typed {what} stream")
-    if not is_sha256(captured.device_sha256):
-        raise CaptureRefused(f"{what}: device digest is not 64 lowercase hex characters")
-    if type(captured.device_size) is not int or captured.device_size < 0:
-        raise CaptureRefused(f"{what}: device size is not a non-negative integer")
-    if captured.device_size > limit:
-        raise CaptureRefused(f"{what}: device reports a size larger than the capsule limit; refusing")
+    # Take the iterator before any metadata check, so a valid closeable stream is
+    # closed on EVERY refusal path -- including an oversize/bad-digest reject that
+    # happens before the first chunk is ever read -- not only mid-transfer.
     reader = iter(captured.chunks)
     total = 0
     try:
+        if not is_sha256(captured.device_sha256):
+            raise CaptureRefused(f"{what}: device digest is not 64 lowercase hex characters")
+        if type(captured.device_size) is not int or captured.device_size < 0:
+            raise CaptureRefused(f"{what}: device size is not a non-negative integer")
+        if captured.device_size > limit:
+            raise CaptureRefused(f"{what}: device reports a size larger than the capsule limit; refusing")
         with open(dest, "xb") as handle:
             for chunk in reader:
                 if type(chunk) is not bytes:
@@ -433,9 +436,18 @@ def _publish(staged_capsule: Path, out: Path) -> tuple[int, int]:
         raise CaptureRefused(
             "owner storage destination appeared before publication; refusing to overwrite") from None
     created = os.lstat(out)
-    for child in sorted(os.listdir(staged_capsule)):
-        os.rename(staged_capsule / child, out / child)
-    return (created.st_dev, created.st_ino)
+    identity = (created.st_dev, created.st_ino)
+    # A member move can fail partway (for example an OSError on the second rename),
+    # which would leave a partially populated directory we own but whose identity
+    # the caller never received. Remove our own partial output here before
+    # re-raising; _remove_created_output leaves a replaced or raced target alone.
+    try:
+        for child in sorted(os.listdir(staged_capsule)):
+            os.rename(staged_capsule / child, out / child)
+    except BaseException:
+        _remove_created_output(out, identity)
+        raise
+    return identity
 
 
 def _remove_created_output(out: Path, identity: tuple[int, int]) -> None:

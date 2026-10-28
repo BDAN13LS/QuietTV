@@ -256,6 +256,33 @@ class Streaming(CaptureCase):
         backend = FakeBackend(payload_size={"org.example.alpha": capture.MAX_MEMBER_BYTES + 1})
         self.assertRefused("larger than the capsule limit", backend=backend)
 
+    def test_oversize_closes_the_stream_without_reading_a_chunk(self):
+        # Metadata is rejected before the first chunk; the closeable stream must
+        # still be closed, and no chunk read.
+        chunks = ClosableChunks([b"abc", b"def"])
+
+        class Oversize(FakeBackend):
+            def capture_package(self, package_id, install_root, *, max_bytes):
+                self.calls.append(f"payload:{package_id}")
+                return CapturedStream(device_sha256="a" * 64,
+                                      device_size=capture.MAX_MEMBER_BYTES + 1, chunks=chunks)
+
+        self.assertRefused("larger than the capsule limit", backend=Oversize())
+        self.assertTrue(chunks.closed, "an oversize refusal leaked the transfer iterator")
+        self.assertEqual(chunks.consumed, 0, "an oversize refusal read a chunk before refusing")
+
+    def test_invalid_digest_closes_the_stream_without_reading_a_chunk(self):
+        chunks = ClosableChunks([b"abc"])
+
+        class BadDigest(FakeBackend):
+            def capture_package(self, package_id, install_root, *, max_bytes):
+                self.calls.append(f"payload:{package_id}")
+                return CapturedStream(device_sha256="not-hex", device_size=3, chunks=chunks)
+
+        self.assertRefused("64 lowercase hex", backend=BadDigest())
+        self.assertTrue(chunks.closed, "a bad-digest refusal leaked the transfer iterator")
+        self.assertEqual(chunks.consumed, 0, "a bad-digest refusal read a chunk before refusing")
+
 
 class Identity(CaptureCase):
     def test_facts_matching_no_profile_refuse(self):
@@ -579,6 +606,30 @@ class Publication(CaptureCase):
         self.assertIn("refusing to overwrite", str(ctx.exception))
         self.assertTrue(self.out.is_dir(), "a raced empty destination was replaced or deleted")
         self.assertEqual(list(self.out.iterdir()), [], "a refused publish wrote into the raced directory")
+        self.assertNoStagingLeft()
+
+    def test_partial_member_move_failure_cleans_only_own_output(self):
+        # The second rename into the reserved output fails: the first member is
+        # already in place, so _publish must remove its own partial output before
+        # re-raising, and leave a sibling in owner storage untouched.
+        sentinel = self.storage / "KEEP.txt"
+        sentinel.write_text("keep me", encoding="utf-8")
+        real_rename = os.rename
+        moves = {"n": 0}
+
+        def flaky_rename(src, dst):
+            if Path(dst).parent == self.out:
+                moves["n"] += 1
+                if moves["n"] == 2:
+                    raise OSError("synthetic I/O failure on the second member move")
+            return real_rename(src, dst)
+
+        with mock.patch.object(capture.os, "rename", flaky_rename):
+            with self.assertRaises(OSError):
+                self.run_capture()
+        self.assertGreaterEqual(moves["n"], 2, "the test did not exercise a second member move")
+        self.assertFalse(self.out.exists(), "a partially moved owned output was left behind")
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep me", "a sibling in owner storage was touched")
         self.assertNoStagingLeft()
 
     def test_cleanup_preserves_a_replaced_output(self):
