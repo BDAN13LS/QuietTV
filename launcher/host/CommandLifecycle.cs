@@ -476,6 +476,159 @@ internal static class EcoreCommandRunner {
  }
 }
 
+// ===========================================================================================
+// Ecore-native LONG-LIVED helper -- the SAME crash root cause as the stop/launch runner above, but for
+// the two children that must outlive the ordinary 2.5 s command deadline: the IPTV player (QuietIPTV.dll)
+// and the web dashboard viewer (QuietIPTV.dll --dashboard). The old path owned a System.Diagnostics.Process
+// for each, drained it with the managed async line readers and force-closed it with the managed kill/wait. A
+// long-lived .NET-owned child that EXITS while the ecore main loop is pumping (the viewer dies and is
+// restarted; the IPTV child is force-closed or crashes) races ecore's waitpid(-1) SIGCHLD reaper exactly as
+// the launch path did -> ProcessWaitState gets ECHILD -> Environment.FailFast -> SIGABRT, which no managed
+// try/catch can stop. The fix owns NO .NET Process: ecore_exe spawns and reaps the child, its exit arrives
+// as ECORE_EXE_EVENT_DEL on the main loop, and a forced close is an identity-guarded exact-pid libc kill
+// (never ecore_exe_kill's 10 s doomsday SIGKILL timer, never a process tree). There is deliberately NO
+// deadline timer here: a helper is long-lived and must never be killed merely for outliving 2.5 s -- only
+// the session's own cooperative-close grace escalates to a kill.
+
+// What IptvSession/WebFrontend hold instead of a Process. Pure and offline-driven in tests; wired to ecore
+// by EcoreHelperRunner in production.
+internal interface ILongLivedHelper : IDisposable {
+ bool Started { get; }   // spawn succeeded
+ bool Alive { get; }     // started and not yet seen to exit (no ECORE_EXE_EVENT_DEL)
+ int Pid { get; }        // 0 when not started
+ string[] DrainLines();  // complete output lines captured since the last drain (the fatal= diagnostic scan)
+ void Kill();            // forced close: identity-guarded exact-pid SIGKILL of OUR child only; non-blocking
+}
+
+// A long-lived helper as a PURE state machine (no PInvoke): the adapter feeds it ecore DATA/DEL and the
+// real identity-guarded signal; a fake test feeds it the same transitions. Output is captured as bounded
+// COMPLETE lines; the forced kill is attempted through an injected signal and records Killed only when the
+// signal actually lands; Dispose is non-blocking (never WaitForExit). Everything runs on the ecore main
+// thread in production (DATA/DEL are main-loop events), so the buffers need no locking.
+internal sealed class EcoreHelper : ILongLivedHelper {
+ internal const int MaxLines=64,MaxLineLen=512;    // bounded line capture; a diagnostic, not a transport
+ readonly Func<bool> trySignal;                    // identity-guarded exact-pid SIGKILL; true iff it landed
+ readonly Queue<string> ready=new();               // complete lines not yet drained (bounded by MaxLines)
+ readonly StringBuilder line=new();                // the in-progress partial line
+ readonly int pid; readonly long startId;
+ bool started,exited,killed,disposed; int dropped;
+ internal IntPtr Handle;                            // adapter bookkeeping (the ecore_exe handle)
+ internal EcoreHelper(int pid,long startId,Func<bool> trySignal){this.pid=pid;this.startId=startId;this.trySignal=trySignal;started=pid>0;}
+ public bool Started=>started;
+ public bool Alive=>started&&!exited;
+ public int Pid=>started?pid:0;
+ internal long StartId=>startId;
+ internal bool Killed=>killed;
+ internal bool Disposed=>disposed;
+ internal int Dropped=>dropped;
+ // ecore DATA/ERROR (main loop): accumulate bounded COMPLETE lines for the session's fatal= scan. Past the
+ // line/count caps, extra bytes/lines are dropped (still counted) so capture can never grow unbounded.
+ internal void OnData(byte[] data,int size){
+  if(size<=0||exited)return;
+  for(int i=0;i<size;i++){byte b=data[i];if(b==(byte)'\n')Emit();else if(line.Length<MaxLineLen)line.Append((char)b);} // ASCII diagnostic text
+ }
+ void Emit(){if(ready.Count<MaxLines)ready.Enqueue(line.ToString());else dropped++;line.Clear();}
+ // ecore DEL (main loop): the child exited (on its own or after our kill). One-shot; a late/duplicate DEL
+ // after the first is a no-op (exited stays set, the run is never re-opened).
+ internal void OnExit(){exited=true;}
+ public string[] DrainLines(){var a=ready.ToArray();ready.Clear();return a;}
+ // Forced close: attempt the identity-guarded exact-pid SIGKILL of OUR child. Safe to call repeatedly (the
+ // identity guard refuses a reused/disappeared pid); records Killed only once a signal has ACTUALLY landed.
+ // Never blocks, never a tree. A denied/failed signal leaves the child to finish via its own DEL.
+ public void Kill(){if(!Alive)return;try{if(trySignal())killed=true;}catch{}}
+ // Non-blocking: give up the handle. Never WaitForExit. The child's later DEL still clears the adapter map.
+ public void Dispose(){disposed=true;}
+}
+
+// The safe exe/args builder for a long-lived helper. Like CommandArgs it guarantees ecore DIRECT execvp
+// (no /bin/sh) and exact argv by refusing whitespace, shell metacharacters and non-ASCII; it differs only
+// in permitting a FIXED allowlist of option flags (--dashboard, --start-hidden) that the session passes as
+// literals. Owner config supplies ONLY the dll path (a value arg, no leading '-'), so an unsafe or injected
+// path is refused (null) and nothing is spawned.
+internal static class HelperArgs {
+ static readonly string[] Flags={"--dashboard","--start-hidden"};
+ static bool SafeChar(char c)=>(c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='.'||c=='_'||c=='-'||c=='/'||c==':'||c=='@'||c=='+';
+ internal static bool SafeToken(string a){
+  if(string.IsNullOrEmpty(a))return false;
+  if(Array.IndexOf(Flags,a)>=0)return true;   // exact known option flag
+  if(a[0]=='-')return false;                  // a value must not start with '-' (option injection)
+  foreach(char ch in a)if(!SafeChar(ch))return false; // distinct var from CommandArgs so each refusal mutates independently
+  return true;
+ }
+ internal static string BuildLine(string exe,IReadOnlyList<string> args){
+  if(string.IsNullOrEmpty(exe)||exe[0]=='-'||!SafeToken(exe))return null; // the exe is a path, never a flag
+  var sb=new StringBuilder(exe);
+  foreach(var a in args){if(!SafeToken(a))return null;sb.Append(' ').Append(a);}
+  return sb.ToString();
+ }
+}
+
+// Production adapter (real Tizen): spawns a long-lived helper through ecore_exe, tracks the handle, feeds
+// ecore DATA/DEL to the EcoreHelper, and performs the identity-guarded exact-pid kill. NO deadline timer
+// (long-lived), no .NET Process, all on the main loop. PInvoke binds lazily on first use so the Windows
+// self-test (which never calls Start) never loads libecore. Independent of EcoreCommandRunner: its own
+// handlers key their OWN map and return ECORE_CALLBACK_PASS_ON (1), so the two handler sets coexist on the
+// same ecore_exe events without interfering.
+internal static class EcoreHelperRunner {
+ internal const int MaxHelpers=8;        // hard cap on tracked long-lived children (only iptv+web in practice)
+ const int ECORE_EXE_PIPE_READ=1,ECORE_EXE_PIPE_ERROR=4,SIGKILL=9;
+ [UnmanagedFunctionPointer(CallingConvention.Cdecl)] delegate int ExeEventCb(IntPtr data,int type,IntPtr info);
+ [DllImport("libecore.so.1")] static extern IntPtr ecore_exe_pipe_run(string exe_cmd,int flags,IntPtr data);
+ [DllImport("libecore.so.1")] static extern int ecore_exe_pid_get(IntPtr exe);
+ [DllImport("libecore.so.1")] static extern IntPtr ecore_event_handler_add(int type,ExeEventCb cb,IntPtr data);
+ [DllImport("libecore.so.1")] static extern IntPtr ecore_event_handler_del(IntPtr handler);
+ [DllImport("libc",SetLastError=true)] static extern int kill(int pid,int sig);
+ static readonly ExeEventCb OnDataCb=OnExeData,OnErrCb=OnExeError,OnDelCb=OnExeDel;
+ static readonly Dictionary<IntPtr,EcoreHelper> byHandle=new();
+ static int initState; static string initError="";
+ internal static int Tracked=>byHandle.Count;
+ // The ONLY kill in this adapter: a single exact pid, and ONLY when the recorded and freshly-read /proc
+ // start-times both exist and match exactly. Returns true iff an actual SIGKILL was sent and kill() got 0.
+ static bool KillExact(int pid,long recordedStart)=>ProcStat.IdentityMatches(pid,recordedStart,ProcStat.ReadStartTime(pid))&&kill(pid,SIGKILL)==0;
+ // Pure init decision (Windows-testable): ready ONLY when all three event handlers registered non-null.
+ internal static bool HandlersOk(IntPtr del,IntPtr dat,IntPtr err)=>del!=IntPtr.Zero&&dat!=IntPtr.Zero&&err!=IntPtr.Zero;
+ static bool EnsureInit(){
+  if(initState!=0)return initState==1;
+  try{
+   var lib=NativeLibrary.Load("libecore.so.1");
+   int del=Marshal.ReadInt32(NativeLibrary.GetExport(lib,"ECORE_EXE_EVENT_DEL"));
+   int dat=Marshal.ReadInt32(NativeLibrary.GetExport(lib,"ECORE_EXE_EVENT_DATA"));
+   int err=Marshal.ReadInt32(NativeLibrary.GetExport(lib,"ECORE_EXE_EVENT_ERROR"));
+   IntPtr hDel=ecore_event_handler_add(del,OnDelCb,IntPtr.Zero);
+   IntPtr hDat=ecore_event_handler_add(dat,OnDataCb,IntPtr.Zero);
+   IntPtr hErr=ecore_event_handler_add(err,OnErrCb,IntPtr.Zero);
+   if(!HandlersOk(hDel,hDat,hErr)){foreach(var h in new[]{hDel,hDat,hErr})if(h!=IntPtr.Zero)ecore_event_handler_del(h);throw new InvalidOperationException("ecore_event_handler_add returned null");}
+   initState=1;return true;
+  }catch(Exception e){initError=e.Message;initState=-1;return false;} // memoize permanent failure; never retry/spawn
+ }
+ // Start a long-lived helper. Returns null (the caller treats it as "did not start") on an unsafe command,
+ // a failed init, a full tracking map, or a spawn failure. Never spawns after a failed init.
+ internal static ILongLivedHelper Start(string exe,IReadOnlyList<string> args){
+  string line=HelperArgs.BuildLine(exe,args);
+  if(line==null)return null;
+  if(byHandle.Count>=MaxHelpers)return null;
+  if(!EnsureInit())return null;
+  IntPtr h=ecore_exe_pipe_run(line,ECORE_EXE_PIPE_READ|ECORE_EXE_PIPE_ERROR,IntPtr.Zero);
+  if(h==IntPtr.Zero)return null;
+  int pid=ecore_exe_pid_get(h);
+  long startId=ProcStat.ReadStartTime(pid);
+  var helper=new EcoreHelper(pid,startId,()=>KillExact(pid,startId)){Handle=h};
+  byHandle[h]=helper;return helper;
+ }
+ static void CopyData(IntPtr info,EcoreHelper helper){
+  IntPtr buf=Marshal.ReadIntPtr(info,IntPtr.Size);int size=Marshal.ReadInt32(info,2*IntPtr.Size); // Ecore_Exe_Event_Data{exe*,data*,size}
+  if(buf==IntPtr.Zero||size<=0)return;
+  int take=Math.Min(size,EcoreHelper.MaxLineLen*EcoreHelper.MaxLines);
+  var bytes=new byte[take];Marshal.Copy(buf,bytes,0,take);helper.OnData(bytes,take);
+ }
+ static int OnExeData(IntPtr data,int type,IntPtr info){try{if(byHandle.TryGetValue(Marshal.ReadIntPtr(info,0),out var h))CopyData(info,h);}catch{}return 1;}
+ static int OnExeError(IntPtr data,int type,IntPtr info){try{if(byHandle.TryGetValue(Marshal.ReadIntPtr(info,0),out var h))CopyData(info,h);}catch{}return 1;}
+ static int OnExeDel(IntPtr data,int type,IntPtr info){
+  try{IntPtr exe=Marshal.ReadIntPtr(info,8);if(byHandle.TryGetValue(exe,out var h)){h.OnExit();byHandle.Remove(exe);}}catch{} // {pid,exit_code,exe*,...}; handle auto-freed by ecore after this
+  return 1; // ECORE_CALLBACK_PASS_ON: let the command runner's handler see it too
+ }
+}
+
 // Offline acceptance (no TV, no PInvoke): drives the real runner and queue with fakes in both
 // directions. Hang-prone cases run under an in-test wall-clock watchdog that polls Done exactly as
 // the ecore loop does, so a deadline/generation regression FAILS a named claim instead of hanging.
@@ -725,6 +878,60 @@ internal static class CommandLifecycleTests {
   ge.Arm("org.tizen.netflix-app",ownHome,1000);ge.Arm("",ownHome,1000);Check(!ge.Armed,"an ineligible re-arm stands the guard down");
   // 6. Pre-registered window.
   Check(HomeReturnGuard.WindowMs==8000,"the Home-return guard window is the pre-registered 8000 ms");
+
+  // --- Ecore-native LONG-LIVED helper (pure state machine, no PInvoke): the IPTV/web helper paths ---
+  // Signal recorders: one that always lands the kill, one that never does (identity denied / reused pid).
+  static EcoreHelper Helper(bool signalLands,out int[] signalCalls){var calls=new int[1];signalCalls=calls;return new EcoreHelper(100,7,()=>{calls[0]++;return signalLands;});}
+  // 1. Long-lived start: a real pid is Started and Alive, and it STAYS alive with no deadline (it never
+  //    inherits the 2.5 s command lifetime -- nothing here can kill it for merely living on).
+  var h1=Helper(true,out _);
+  Check(h1.Started&&h1.Alive&&h1.Pid==100,"helper: a spawned long-lived helper is Started and Alive");
+  Check(h1.Alive,"helper: a long-lived helper stays Alive with no deadline (it does not inherit the 2.5 s command limit)");
+  // 2. A pid<=0 is a failed spawn: not Started, not Alive, Pid 0.
+  var hfail=new EcoreHelper(0,0,()=>true);
+  Check(!hfail.Started&&!hfail.Alive&&hfail.Pid==0,"helper: a non-positive pid is reported as not started");
+  // 3. Clean spontaneous exit (ecore DEL) flips Alive to false exactly once; a duplicate DEL is a no-op.
+  var h3=Helper(true,out _);h3.OnExit();
+  Check(!h3.Alive&&h3.Started,"helper: a spontaneous exit (ecore DEL) ends Alive");
+  h3.OnExit();Check(!h3.Alive,"helper: a duplicate/late DEL after exit is a no-op (never re-opens the run)");
+  // 4. Output is captured as bounded complete lines: a partial line is withheld until its newline, the line
+  //    count is capped, and an over-long line is truncated -- capture can never grow unbounded.
+  var h4=Helper(true,out _);
+  h4.OnData(Encoding.UTF8.GetBytes("fatal=boom\nhalf"),15);
+  var lines=h4.DrainLines();
+  Check(lines.Length==1&&lines[0]=="fatal=boom","helper: a complete line is drained and the trailing partial line is withheld");
+  Check(h4.DrainLines().Length==0,"helper: draining twice does not repeat already-drained lines");
+  h4.OnData(Encoding.UTF8.GetBytes("done\n"),5);
+  Check(h4.DrainLines().SequenceEqual(new[]{"halfdone"}),"helper: the partial line completes on its newline across DATA events");
+  var h4b=Helper(true,out _);
+  for(int i=0;i<EcoreHelper.MaxLines*4;i++)h4b.OnData(Encoding.UTF8.GetBytes("x\n"),2);
+  Check(h4b.DrainLines().Length<=EcoreHelper.MaxLines&&h4b.Dropped>0,"helper: the captured-line count is hard-capped (excess is dropped, never buffered unbounded)");
+  var h4c=Helper(true,out _);h4c.OnData(Encoding.UTF8.GetBytes(new string('a',EcoreHelper.MaxLineLen*3)+"\n"),EcoreHelper.MaxLineLen*3+1);
+  Check(h4c.DrainLines()[0].Length==EcoreHelper.MaxLineLen,"helper: an over-long line is truncated to the cap");
+  // 5. Forced close / stop deadline: a kill whose signal LANDS records Killed; repeated kills are safe and
+  //    the identity-guarded signal is re-attempted each time (matching the per-deadline Poll re-kill).
+  var h5=Helper(true,out var sig5);h5.Kill();
+  Check(h5.Killed&&sig5[0]==1,"helper: a forced close whose exact-pid signal lands records Killed");
+  h5.Kill();Check(h5.Killed&&sig5[0]==2,"helper: a repeated forced close re-attempts the identity-guarded signal (bounded, idempotent state)");
+  // 6. Stale PID / no signal: a kill whose identity guard DENIES the signal never claims Killed; the helper
+  //    stays Alive until its own DEL arrives (we never fake a death we did not cause).
+  var h6=Helper(false,out var sig6);h6.Kill();
+  Check(!h6.Killed&&sig6[0]==1&&h6.Alive,"helper: a denied/stale-identity signal never claims a kill and leaves the child to its own DEL");
+  h6.OnExit();Check(!h6.Alive&&!h6.Killed,"helper: the denied-signal child still finishes via its own DEL, never marked Killed");
+  // 7. Repeat cleanup: Dispose is non-blocking and idempotent; a kill after exit or after dispose is a no-op.
+  var h7=Helper(true,out var sig7);h7.Dispose();h7.Dispose();
+  Check(h7.Disposed,"helper: Dispose is non-blocking and idempotent");
+  h7.OnExit();h7.Kill();Check(sig7[0]==0,"helper: a kill after exit does not signal (nothing of ours is alive to kill)");
+  // 8. HelperArgs: direct-exec, exact-argv safe builder. The real IPTV/web invocations build; shell
+  //    metacharacters, whitespace, a leading '-' value and an empty token are refused (null => no spawn).
+  Check(HelperArgs.BuildLine("/usr/bin/dotnet",new[]{"/home/owner/share/apps/quiet-tv/QuietIPTV.dll"})=="/usr/bin/dotnet /home/owner/share/apps/quiet-tv/QuietIPTV.dll","helper-args: the IPTV helper builds the exact direct-exec command line");
+  Check(HelperArgs.BuildLine("/usr/bin/dotnet",new[]{"/x/QuietIPTV.dll","--dashboard","--start-hidden"})=="/usr/bin/dotnet /x/QuietIPTV.dll --dashboard --start-hidden","helper-args: the web helper's --dashboard/--start-hidden flags are allowlisted");
+  foreach(var harg in new[]{"a b","a;b","a|b","a$b","a`b","a\"b","a'b","a*b","-rf","--unknown",""})
+   Check(HelperArgs.BuildLine("/usr/bin/dotnet",new[]{harg})==null,"helper-args: an unsafe/injected arg refuses the whole command: "+harg);
+  Check(HelperArgs.BuildLine("--dashboard",new string[0])==null,"helper-args: the exe is never a flag");
+  // 9. Fail-closed init decision mirrors the command runner: ready only when all three handlers register.
+  Check(EcoreHelperRunner.HandlersOk(new IntPtr(1),new IntPtr(2),new IntPtr(3)),"helper-init: three non-null handlers => ready");
+  Check(!EcoreHelperRunner.HandlersOk(IntPtr.Zero,new IntPtr(2),new IntPtr(3)),"helper-init: a null handler => NOT ready (fail closed)");
 
   Console.WriteLine("PASS "+count+" command lifecycle assertions");return count;
  }

@@ -142,6 +142,29 @@ class SourceShape(unittest.TestCase):
         self.assertRegex(runner, r'DllImport\("libc"[^)]*\)\]\s*static extern int kill\(',
                          "must kill the exact pid through libc kill()")
 
+    def test_long_lived_helpers_own_no_dotnet_process(self):
+        # The IPTV player and web dashboard viewer are long-lived children: the SAME ProcessWaitState-vs-ecore
+        # SIGCHLD crash as the launch path, but for a child that exits while the loop pumps. They must own no
+        # System.Diagnostics.Process -- spawned/reaped by the shared Ecore-native long-lived helper instead --
+        # in the public host. The private controller is checked in its own checkout.
+        runner = _code("CommandLifecycle.cs")
+        for token in ("interface ILongLivedHelper", "sealed class EcoreHelper", "static class EcoreHelperRunner",
+                      "static class HelperArgs", "ILongLivedHelper Start(string exe"):
+            self.assertIn(token, runner, f"{token} missing from the Ecore-native long-lived helper")
+        # No deadline-kill timer on the long-lived path (it must outlive the 2.5 s command limit): the helper
+        # runner spawns and tracks but never arms an ecore_timer to kill its child.
+        helper_runner = runner.split("static class EcoreHelperRunner", 1)[1].split("// Offline acceptance", 1)[0]
+        self.assertNotIn("ecore_timer_add", helper_runner, "a long-lived helper must not arm a deadline-kill timer")
+        self.assertNotIn("ecore_exe_kill", helper_runner, "must not use ecore_exe_kill (its 10 s doomsday SIGKILL timer)")
+        self.assertIn("kill(pid,SIGKILL)==0", helper_runner, "the forced close is an exact-pid libc kill")
+        for label, iptv, web in (("launcher/host", _code("IptvSession.cs"), _code("WebFrontend.cs")),):
+            for name, code in (("IptvSession", iptv), ("WebFrontend", web)):
+                self.assertIn("ILongLivedHelper", code, f"{label}/{name} must hold an Ecore-native helper handle")
+                for banned in ("new ProcessStartInfo(", "Process.Start(", ".BeginOutputReadLine(",
+                               ".BeginErrorReadLine(", ".WaitForExit(", ".Kill(true)"):
+                    self.assertNotIn(banned, code, f"{label}/{name} still owns a .NET Process ({banned})")
+                self.assertNotRegex(code, r"\bProcess\s+\w+\s*;", f"{label}/{name} still declares a System.Diagnostics.Process field")
+
     def test_launch_timers_are_generation_fenced_in_both_programs(self):
         # The Home->new-launch race is fenced by a per-launch token carried in each timer's data pointer.
         # An old timer scheduled with IntPtr.Zero would never match a live token (tokens start at 1) -- but it
@@ -604,6 +627,11 @@ GUARDS = {
     # would then be accepted (and, on TV, either corrupt argv or force /bin/sh). "a b" is the first refusal.
     "ecore-arg-safety": ("CommandLifecycle.cs", "foreach(char c in a)if(!SafeChar(c))return false;", "",
                          "an unsafe argument is refused: a b"),
+    # Long-lived helper path: the SAME direct-exec/exact-argv refusal for HelperArgs (IPTV/web). Removing it
+    # lets a shell metacharacter or whitespace through to ecore_exe, so a hung-up unsafe token could spawn a
+    # /bin/sh wrapper instead of the exact CLI -- the helper-args self-test then accepts "a b".
+    "helper-arg-safety": ("CommandLifecycle.cs", "foreach(char ch in a)if(!SafeChar(ch))return false;", "",
+                          "helper-args: an unsafe/injected arg refuses the whole command: a b"),
     # Ecore path: disable the deadline's kill request. A hung app_launcher child would then never be
     # terminated at the deadline -- the freeze/leak this path exists to bound.
     "ecore-deadline-kill": ("CommandLifecycle.cs",
@@ -622,6 +650,18 @@ GUARDS = {
                        "internal void OnDel(int exitCode,bool exited){if(completed)return;Finish(exited?exitCode:-1);}",
                        "internal void OnDel(int exitCode,bool exited){Finish(exited?exitCode:-1);}",
                        "ecore: a duplicate/late DEL (and a post-completion deadline) cannot re-complete or overwrite the run"),
+    # Long-lived helper: weaken the kill-identity gate so it claims a kill even when the exact-pid signal was
+    # denied/never landed. The stale-identity helper claim then fails (it would be marked Killed wrongly).
+    "helper-kill-identity": ("CommandLifecycle.cs",
+                             "public void Kill(){if(!Alive)return;try{if(trySignal())killed=true;}catch{}}",
+                             "public void Kill(){if(!Alive)return;try{trySignal();killed=true;}catch{}}",
+                             "helper: a denied/stale-identity signal never claims a kill and leaves the child to its own DEL"),
+    # Long-lived helper: drop the DEL->exited transition. A helper whose child exited would then stay Alive
+    # forever (the controller would never notice the IPTV/web child died), failing the DEL claim.
+    "helper-exit-del": ("CommandLifecycle.cs",
+                        "internal void OnExit(){exited=true;}",
+                        "internal void OnExit(){}",
+                        "helper: a spontaneous exit (ecore DEL) ends Alive"),
     "home-return-match": ("CommandLifecycle.cs", 'if(foreground==target){target="";return true;}',
                           'if(foreground==target){target="";return false;}',
                           "the exact late-surfacing cancelled app reclaims home once"),

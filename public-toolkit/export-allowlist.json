@@ -67,7 +67,12 @@
     "tools/plan_optional_apps.py",
     "tests/test_optional_app_plan.py",
     "THIRD-PARTY-NOTICES.md",
-    "launcher/host/CommandLifecycle.cs"
+    "launcher/host/CommandLifecycle.cs",
+    "probe/ecore-runner/.gitignore",
+    "probe/ecore-runner/EcoreRunnerProbe.csproj",
+    "probe/ecore-runner/Program.cs",
+    "probe/ecore-runner/README.md",
+    "tests/test_ecore_probe_fd.py"
   ],
   "includeIfPresent": [
     "README.md",

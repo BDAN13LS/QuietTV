@@ -4,7 +4,7 @@ using System.Text.Json;
 using static Native;
 static class Program {
  // Public host: every device value comes from the validated HostConfig (--config PATH).
- static HostConfig config;static string Root=>config.RuntimeRoot;static InputEventLayout inputLayout;static readonly IProcessStarter starter=new SystemProcessStarter();static readonly ISessionFiles sessionFiles=new DiskSessionFiles();
+ static HostConfig config;static string Root=>config.RuntimeRoot;static InputEventLayout inputLayout;static readonly IHelperStarter starter=new EcoreHelperStarter();static readonly ISessionFiles sessionFiles=new DiskSessionFiles();
  static long homeEpoch;static string lastOrdinary="";static bool registeredUi;static bool systemHome;static WebFrontend web;static IptvSession iptv;static bool iptvVisible;static bool webReady;static long webStarted,handoffDeadline;static State state;static Canvas canvas;static bool hidden,animating,dismissed;static long lastKey,animationStart,launchDeadline;static string pendingApp="";static LaunchRoute pendingRoute;static readonly EventCallback EventHandler=OnEvent;static readonly Native.TimerCallback Heartbeat=Tick;static readonly Native.TimerCallback SnapshotStart=StartSnapshot;static readonly Native.TimerCallback SnapshotSave=SaveSnapshot;static readonly Native.TimerCallback FocusAnimation=Animate;static readonly Native.TimerCallback HomeActivation=ActivateLater;static readonly Native.TimerCallback LaunchWatch=CheckLaunch;
  [DllImport("libc",SetLastError=true)]static extern int open(string path,int flags);
  [DllImport("libc",SetLastError=true)]static extern int read(int fd,byte[] buffer,int count);
