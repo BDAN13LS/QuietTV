@@ -216,6 +216,7 @@ Claude Code, Codex and OpenCode, remote controls, screenshots and optional
 reachable. Network power-on must be enabled on the TV.
 
 This controller currently needs an already-installed QuietTV service and its
-owner key. It does not yet install QuietTV on a stock TV. Some models refuse
-device/root work; compatibility with older Claude versions is untested. The
-same controls are available from the plain command line.
+owner key. It does not yet install QuietTV on a stock TV. **Claude Opus 4.8 may
+be able to help with setup, but the full setup process has not been verified
+with it.** Some models refuse device/root work. The same controls are available
+from the plain command line.
