@@ -1,5 +1,11 @@
 # D2 typed read-only capture engine
 
+An additional package-only reader is now in `tools/tv-capture`, with a strict
+PC-spooled decoder in `tvkit/package_stream.py`. See its README for protocol,
+limits and required caller transport controls. It is not a complete backend:
+full xattrs, observed firmware facts and the privileged channel remain missing.
+It registers no transport and enables no installer or cleanup action.
+
 `tvkit/capture.py`. Plan phase D2 of
 `docs/superpowers/plans/2026-10-27-consumer-install.md`, offline capture slice.
 
