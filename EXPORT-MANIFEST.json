@@ -13,8 +13,8 @@
     },
     {
       "path": "README.md",
-      "size": 12155,
-      "sha256": "b5d012169e8a3ac495aaf6c4529db708db6e7b4de832b293a53fea6475a0c9dc"
+      "size": 12212,
+      "sha256": "3de760051210233d0a64f140e2a678c6d0f7740a26a1e4aa504513eb906c0c1e"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
@@ -103,8 +103,8 @@
     },
     {
       "path": "public-llm/README.md",
-      "size": 12857,
-      "sha256": "7be9f11839910cb42c727ee757f5bdfce8550df44ae0c9d1deb7a034ca3cf850"
+      "size": 12976,
+      "sha256": "d0d1643f59aad4c77554a2f5836cd877f40572ad313f165bf9ec404415345c82"
     },
     {
       "path": "public-llm/SECURITY.md",

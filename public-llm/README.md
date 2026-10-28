@@ -201,8 +201,9 @@ Every tool is also a plain command, with the same identity checks and allowlists
   setting to bypass a refusal** and accepts no contributions that try to; use the human CLI instead.
 - **Provider policies vary** and change over time. What one client or model allows, another may not.
 - **No model guarantees.** Development was assisted by Claude Opus 5.5. The stdio protocol tests exercise an SDK client, not an LLM model.
-  Older models, Claude 4.6 included, and other providers are **untested**. A model can misread a capture or
-  press the wrong key; nothing here makes its judgement reliable. Confirm results yourself.
+  **Claude Opus 4.8 may be able to help with setup, but the full setup process has not been verified with it.**
+  Other older models, Claude 4.6 included, and other providers are **untested**. A model can misread a capture
+  or press the wrong key; nothing here makes its judgement reliable. Confirm results yourself.
 - The server's own limits hold whatever the model asks: fixed keys and apps, identity checks, no shell.
 
 ## Frontend developer preview
