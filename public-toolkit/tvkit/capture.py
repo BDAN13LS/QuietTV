@@ -1,5 +1,6 @@
 """Typed read-only backup capture: read a device through an injected backend,
-assemble an owner-storage capsule, and prove it with the existing readback gate.
+assemble an owner-storage capsule, and prove the actual owner-storage copy with
+the existing readback gate.
 
 D2 of docs/superpowers/plans/2026-10-27-consumer-install.md, offline capture
 slice. This is the seam between a device-reading adapter and the capsule the
@@ -12,15 +13,26 @@ What it does, for one declared capture request:
 1. Reads device facts through the injected backend and binds them to exactly one
    built-in profile and the hashed owner-TV fingerprint. An unsupported or
    incomplete identity refuses here, before anything is captured.
-2. Captures each declared optional package's payload tar and its XattrBackup
-   dump, plus the current values of the declared registry fields and startup/Home
-   keys, through the backend. Every blob carries the digest the TV computed for
-   itself (``hash-on-device``); that digest, never a PC re-hash, is what the gate
-   is given.
-3. Assembles the capsule into the owner's own storage, which must be a path
-   OUTSIDE this repository, through the real ``assemble`` validator.
-4. Runs ``readback_gate`` against the TV-side digests and returns its
-   ``GateResult`` as the capture evidence.
+2. Validates the WHOLE request (package ids, roots and count, registry field
+   names, startup/Home key names, ``ourPackages``) against the profile and capsule
+   allowlists BEFORE any package, registry or system-key read, so an unknown
+   field or key never reaches the backend.
+3. Streams each declared package's payload tar and its XattrBackup dump through
+   the backend one blob at a time, staging each to disk under the owner-storage
+   parent with per-chunk and aggregate size bounds; it never holds every payload
+   in memory. It reads the current values of the declared registry fields and
+   startup/Home keys. Every blob carries the digest the TV computed for itself
+   (``hash-on-device``); that digest, never a PC re-hash, is what the gate is
+   given.
+4. Re-reads the device facts and refuses if the identity or fingerprint changed
+   during the capture (an adapter reconnect or device switch must not pass
+   unnoticed).
+5. Assembles the capsule in the staging area through the real ``assemble``
+   validator, gates the staged copy, then publishes it to owner storage by a
+   same-volume rename that never overwrites a preexisting or raced destination.
+6. Runs ``readback_gate`` against the TV-side digests on the ACTUAL owner-storage
+   copy and returns its ``GateResult`` as the capture evidence, so a corruption
+   introduced by publication cannot pass as proven.
 
 Boundaries this slice holds:
 
@@ -29,34 +41,40 @@ Boundaries this slice holds:
   constructed and passed in by the owner's own reviewed code. ``transport.TRANSPORTS``
   stays empty. A fake backend is a test double, never a stand-in for a real SDB
   or root transport.
-* **Zero TV writes, zero repo writes.** The backend only reads. The engine writes
-  the capsule to owner storage and nothing else; its working files live in a
-  temporary directory that is removed. Nothing here mutates or removes anything on
-  a device.
+* **Bounded transfer.** The backend yields size-capped chunks with a declared
+  size and a TV digest. Each blob is streamed to disk one at a time under
+  explicit per-chunk and aggregate limits (the existing capsule schema maxima);
+  the iterator is closed on every path, including a refusal. Real adapters MUST
+  enforce the transfer limit themselves; the fixture helper materialises bytes
+  for tests only.
+* **Zero TV writes.** The backend only reads. The engine stages and publishes to
+  owner storage and removes only the scratch and output it created in this
+  operation; it never touches the device or a preexisting/raced destination.
 * **Refuse before trusting.** Unsupported/incomplete identity, device mismatch,
-  missing metadata, path traversal or escaping symlinks, a size the TV did not
-  report, an oversize blob, and bytes that do not match the TV's own digest all
-  raise before a passing result exists. The hash comparison and the traversal and
-  symlink rules are the existing capsule/readback checks, not re-implemented here.
+  an identity change mid-capture, missing metadata, path traversal or escaping
+  symlinks, a size the TV did not report, an oversize blob, and bytes that do not
+  match the TV's own digest all raise before a passing result exists. The hash
+  comparison and the traversal and symlink rules are the existing capsule/readback
+  checks, not re-implemented here.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Iterable, Mapping
 
 from . import assemble as _assemble
 from .backup import GateResult, readback_gate
-from .capsule import (
-    CAPSULE_SCHEMA, MANIFEST_NAME, MAX_MEMBER_BYTES, MAX_XATTR_MANIFEST_BYTES, CapsuleError,
-)
+from .capsule import MAX_MEMBER_BYTES, MAX_PACKAGES, MAX_XATTR_MANIFEST_BYTES, CapsuleError
 from .paths import check_relative, is_identifier, is_sha256
 from .profile import (
-    MATCH_FIELDS, Profile, ProfileError, builtin_profiles, match_device, parse_device_facts,
+    Profile, ProfileError, builtin_profiles, match_device, parse_device_facts,
 )
 
 # Capabilities the backend must declare, mirroring the plan's D2 capture capabilities.
@@ -67,6 +85,13 @@ CAP_HASH = "hash-on-device"
 CAP_REGISTRY = "registry-read"
 CAP_SYSTEM_KEY = "system-key-read"
 BASE_CAPABILITIES = frozenset({CAP_FACTS, CAP_PACKAGE, CAP_XATTR, CAP_HASH})
+
+# A single transferred chunk may not exceed this. It bounds one transfer unit so a
+# backend cannot defeat streaming by handing over one enormous chunk; it is NOT a
+# package-size limit (a package is many chunks, bounded only by the schema maxima
+# MAX_MEMBER_BYTES / MAX_XATTR_MANIFEST_BYTES).
+MAX_CHUNK_BYTES = 16 * 1024 * 1024
+DEFAULT_CHUNK_BYTES = 1024 * 1024
 
 # The repository root, so owner storage can be required to live outside it.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -83,17 +108,38 @@ class CaptureRefused(CapsuleError):
 
 
 @dataclass(frozen=True)
-class CapturedFile:
-    """One file the TV produced, with the digest the TV computed for itself.
+class CapturedStream:
+    """One file the TV produced, as a bounded, lazy byte stream.
 
     ``device_sha256`` is the ``hash-on-device`` result, computed on the TV
-    independently of the transfer. It is the attestation the gate checks the
-    stored bytes against; the engine never substitutes a PC re-hash for it.
+    independently of the transfer; it is the attestation the gate checks the
+    stored bytes against, and the engine never substitutes a PC re-hash for it.
+    ``device_size`` is the size the TV reported. ``chunks`` is an iterable of
+    ``bytes`` yielded lazily; the engine iterates it once, bounds every chunk and
+    the running total, and closes it on every path.
     """
 
-    data: bytes
     device_sha256: str
     device_size: int
+    chunks: Iterable[bytes]
+
+
+def bytes_stream(data: bytes, *, device_sha256: str | None = None, device_size: int | None = None,
+                 chunk_size: int = DEFAULT_CHUNK_BYTES) -> CapturedStream:
+    """Wrap in-memory bytes as a chunked stream. For fixtures/tests and small
+    reads only; a real adapter streams from the device and enforces the limit
+    itself rather than materialising the whole file. ``device_sha256`` and
+    ``device_size`` may be overridden to inject a fault in tests."""
+    if chunk_size < 1:
+        raise ValueError("chunk_size must be positive")
+    digest = device_sha256 if device_sha256 is not None else hashlib.sha256(data).hexdigest()
+    size = device_size if device_size is not None else len(data)
+
+    def generate() -> Iterable[bytes]:
+        for start in range(0, len(data), chunk_size):
+            yield data[start:start + chunk_size]
+
+    return CapturedStream(device_sha256=digest, device_size=size, chunks=generate())
 
 
 class CaptureBackend:
@@ -101,7 +147,9 @@ class CaptureBackend:
 
     This toolkit ships no implementation. Subclasses implement the read methods
     and declare which capabilities they support. There is deliberately no write,
-    run or mutate method: capture never changes a device.
+    run or mutate method: capture never changes a device. The payload and xattr
+    reads return a bounded ``CapturedStream`` and are told the maximum number of
+    bytes they are permitted to transfer.
     """
 
     name = "abstract"
@@ -111,10 +159,10 @@ class CaptureBackend:
     def read_device_facts(self) -> Mapping[str, str]:
         raise CaptureRefused("backend cannot read device facts")
 
-    def capture_package(self, package_id: str, install_root: str) -> CapturedFile:
+    def capture_package(self, package_id: str, install_root: str, *, max_bytes: int) -> CapturedStream:
         raise CaptureRefused("backend cannot capture a package payload")
 
-    def dump_xattrs(self, package_id: str, install_root: str) -> CapturedFile:
+    def dump_xattrs(self, package_id: str, install_root: str, *, max_bytes: int) -> CapturedStream:
         raise CaptureRefused("backend cannot dump xattrs")
 
     def read_registry_field(self, app_id: str, field: str) -> str:
@@ -158,10 +206,9 @@ class CaptureRequest:
 class CaptureResult:
     """Evidence that a capture was written to owner storage and passed the gate.
 
-    The proof is the unforgeable ``GateResult`` the existing engine produced; this
-    only pairs it with where the capsule was written. It exists only when the gate
-    returned, so there is no pass/fail flag to set.
-    """
+    The proof is the unforgeable ``GateResult`` the existing engine produced from
+    the ACTUAL owner-storage copy; this only pairs it with where the capsule was
+    written. It exists only when the gate returned, so there is no pass/fail flag."""
 
     capsule_dir: str
     baseline: str
@@ -169,11 +216,13 @@ class CaptureResult:
 
 
 # --------------------------------------------------------------------------
-# Binding
+# Binding and request validation (all before any package/registry/key read)
 
 
 def _resolve_profile(facts: Mapping[str, str]) -> tuple[Profile, dict[str, str]]:
     """Exactly one built-in profile must match the live facts, or refuse."""
+    if not isinstance(facts, Mapping):
+        raise CaptureRefused("backend device facts must be a mapping")
     try:
         parsed = parse_device_facts(dict(facts))
     except ProfileError as exc:
@@ -206,44 +255,115 @@ def _check_capabilities(backend: CaptureBackend, request: CaptureRequest) -> Non
         raise CaptureRefused("capture requires a read-only backend")
 
 
-def _install_root_for(profile: Profile, package_id: str, install_root: str) -> str:
-    """The install root must be an allowlisted root for this exact package id."""
-    if not is_identifier(package_id):
-        raise CaptureRefused("package id is not a valid identifier")
-    if profile.is_protected(package_id):
-        raise CaptureRefused(f"package {package_id} is protected and is never captured for removal")
-    allowed = {f"{root}/{package_id}" for root in profile.install_roots}
-    if install_root not in allowed:
-        raise CaptureRefused(f"install root for {package_id} is not an allowlisted root; refusing")
-    return install_root
+def _validate_request(profile: Profile, request: CaptureRequest) -> list[tuple[PackageRequest, str]]:
+    """Check every declared id/root/field/key against the allowlists up front.
+
+    Returns the validated (package, install_root) pairs. Raises before the caller
+    performs any backend package, registry or system-key read, so an arbitrary
+    key or field is never handed to the device reader.
+    """
+    if not request.packages:
+        raise CaptureRefused("a capture must declare at least one package")
+    if len(request.packages) > MAX_PACKAGES:
+        raise CaptureRefused(f"a capture may declare at most {MAX_PACKAGES} packages; refusing")
+
+    seen: set[str] = set()
+    packages: list[tuple[PackageRequest, str]] = []
+    for package in request.packages:
+        if not is_identifier(package.package_id):
+            raise CaptureRefused("package id is not a valid identifier")
+        if profile.is_protected(package.package_id):
+            raise CaptureRefused(f"package {package.package_id} is protected and is never captured for removal")
+        allowed = {f"{root}/{package.package_id}" for root in profile.install_roots}
+        if package.install_root not in allowed:
+            raise CaptureRefused(f"install root for {package.package_id} is not an allowlisted root; refusing")
+        folded = package.package_id.casefold()
+        if folded in seen:
+            raise CaptureRefused(f"package {package.package_id} is declared twice")
+        seen.add(folded)
+        packages.append((package, package.install_root))
+
+    reg_seen: set[str] = set()
+    for item in request.registry:
+        if not is_identifier(item.app_id):
+            raise CaptureRefused("registry change names an invalid app id")
+        if profile.is_protected(item.app_id):
+            raise CaptureRefused(f"registry change for {item.app_id} is protected; refusing")
+        if item.app_id in reg_seen:
+            raise CaptureRefused(f"registry change for {item.app_id} is declared twice")
+        reg_seen.add(item.app_id)
+        if not item.fields:
+            raise CaptureRefused(f"registry change for {item.app_id} lists no fields")
+        for field, applied in item.fields.items():
+            if field not in profile.registry_fields:
+                raise CaptureRefused(f"registry field {field!r} is not in the profile allowlist; refusing")
+            if type(applied) is not str:
+                raise CaptureRefused(f"registry intent for {item.app_id}.{field} is not a string")
+
+    key_seen: set[str] = set()
+    for item in request.system_keys:
+        if item.key not in profile.system_keys:
+            raise CaptureRefused(f"startup/Home key {item.key!r} is not an allowlisted key; refusing")
+        if item.key in key_seen:
+            raise CaptureRefused(f"startup/Home key {item.key} is declared twice")
+        key_seen.add(item.key)
+        if type(item.expected_current) is not str:
+            raise CaptureRefused("system key intent is not a string")
+
+    for pid in request.our_packages:
+        if not is_identifier(pid) or profile.is_protected(pid):
+            raise CaptureRefused("ourPackages names an id that is protected or invalid; refusing")
+
+    return packages
 
 
 # --------------------------------------------------------------------------
-# Capture
+# Streaming one blob to disk, bounded, with the iterator always closed
 
 
-def _blob(backend_call, limit: int, what: str) -> CapturedFile:
-    captured = backend_call()
-    if not isinstance(captured, CapturedFile):
-        raise CaptureRefused(f"backend returned no typed {what} blob")
+def _stage_blob(captured: object, dest: Path, limit: int, what: str) -> CapturedStream:
+    """Stream one captured blob to ``dest`` under explicit bounds.
+
+    Bounds the TV's declared size against ``limit`` before reading, then every
+    chunk against ``MAX_CHUNK_BYTES`` and the running total against both the
+    declared size and ``limit`` as it writes. The lazy iterator is closed on
+    every path, including a refusal. Nothing is held whole in memory.
+    """
+    if not isinstance(captured, CapturedStream):
+        raise CaptureRefused(f"backend returned no typed {what} stream")
     if not is_sha256(captured.device_sha256):
         raise CaptureRefused(f"{what}: device digest is not 64 lowercase hex characters")
     if type(captured.device_size) is not int or captured.device_size < 0:
         raise CaptureRefused(f"{what}: device size is not a non-negative integer")
-    # Bound on the TV's own claim first, so an oversize file is refused without
-    # ever holding that many bytes.
-    if captured.device_size > limit or len(captured.data) > limit:
-        raise CaptureRefused(f"{what}: blob is larger than the capsule limit; refusing")
-    if len(captured.data) != captured.device_size:
+    if captured.device_size > limit:
+        raise CaptureRefused(f"{what}: device reports a size larger than the capsule limit; refusing")
+    reader = iter(captured.chunks)
+    total = 0
+    try:
+        with open(dest, "xb") as handle:
+            for chunk in reader:
+                if type(chunk) is not bytes:
+                    raise CaptureRefused(f"{what}: a transfer chunk is not bytes")
+                if len(chunk) > MAX_CHUNK_BYTES:
+                    raise CaptureRefused(f"{what}: a transfer chunk exceeds the per-chunk limit; refusing")
+                total += len(chunk)
+                if total > captured.device_size or total > limit:
+                    raise CaptureRefused(f"{what}: transfer exceeds the size the TV reported; refusing")
+                handle.write(chunk)
+    finally:
+        close = getattr(reader, "close", None)
+        if callable(close):
+            close()
+    if total != captured.device_size:
         raise CaptureRefused(f"{what}: transferred bytes are not the size the TV reported; refusing")
     return captured
 
 
-def _device_digest(captured: CapturedFile) -> str:
+def _device_digest(captured: CapturedStream, staged_path: Path) -> str:
     """The digest the gate is given for a captured file: always the TV's own.
 
-    This is the crux of the capture proof. Returning a PC re-hash of the
-    transferred bytes here (``sha256(captured.data)``) would make the readback
+    This is the crux of the capture proof. Returning a PC re-hash of the staged
+    bytes here (``sha256(staged_path.read_bytes())``) would make the readback
     gate compare the bytes against themselves and silently accept a transfer the
     TV never attested. The gate is only meaningful because this stays the
     ``hash-on-device`` value. The guard-off test replaces exactly this.
@@ -258,6 +378,23 @@ def _read_value(backend_call, what: str) -> str:
     return value
 
 
+def _publish(staged_capsule: Path, out: Path) -> None:
+    """Place the staged capsule at ``out`` by a same-volume rename, never
+    overwriting a preexisting or raced destination.
+
+    Staging lives under ``out``'s parent, so this is a same-volume rename: no
+    cross-volume copy, so no partial or corrupting copy happens here. If a
+    destination has appeared since the early check, it is left untouched.
+    """
+    if out.exists() or out.is_symlink():
+        raise CaptureRefused("owner storage destination appeared before publication; refusing to overwrite")
+    os.rename(staged_capsule, out)
+
+
+# --------------------------------------------------------------------------
+# The engine
+
+
 def capture_backup(
     backend: CaptureBackend,
     request: CaptureRequest,
@@ -268,19 +405,19 @@ def capture_backup(
     """Capture a backup through ``backend`` into ``out_dir`` and prove it.
 
     ``out_dir`` is the owner's own storage. It must not already exist and must
-    live outside this repository. ``baseline`` is the caller's honest declaration
-    (``stock`` or ``current-state``); the gate enforces the one contradiction
-    capsule/1 can show and records the label as ``declared``.
+    live outside this repository; its parent must be a real existing directory
+    (capture stages beside it and publishes by a same-volume rename). ``baseline``
+    is the caller's honest declaration (``stock`` or ``current-state``); the gate
+    enforces the one contradiction capsule/1 can show and records the label as
+    ``declared``.
 
-    Returns a ``CaptureResult`` only on a full pass. Every failure raises a
-    ``CapsuleError`` (``CaptureRefused`` for this engine's own guards,
-    ``ReadbackRefused`` or ``CapsuleError`` from the validator and gate) before a
-    result exists. Writes only to owner storage and a temporary working folder;
-    never to a device or to this repository.
+    Returns a ``CaptureResult`` only on a full pass, built from a readback of the
+    ACTUAL owner-storage copy. Every failure raises a ``CapsuleError``
+    (``CaptureRefused`` for this engine's own guards, ``ReadbackRefused`` or
+    ``CapsuleError`` from the validator and gate) before a result exists. Only the
+    scratch and output this operation created are removed on a refusal; a
+    preexisting or raced destination is preserved. Never writes to a device.
     """
-    if not request.packages:
-        raise CaptureRefused("a capture must declare at least one package")
-
     out = Path(out_dir)
     resolved_out = out.resolve()
     if resolved_out == REPO_ROOT or REPO_ROOT in resolved_out.parents:
@@ -293,95 +430,97 @@ def capture_backup(
     _check_capabilities(backend, request)
 
     facts = backend.read_device_facts()
-    if not isinstance(facts, Mapping):
-        raise CaptureRefused("backend device facts must be a mapping")
     profile, parsed_facts = _resolve_profile(facts)
+    validated_packages = _validate_request(profile, request)
 
-    seen: set[str] = set()
-    spec_packages = []
-    device_hashes: dict[str, str] = {}
-    blobs: dict[str, bytes] = {}
-    for package in request.packages:
-        install_root = _install_root_for(profile, package.package_id, package.install_root)
-        folded = package.package_id.casefold()
-        if folded in seen:
-            raise CaptureRefused(f"package {package.package_id} is declared twice")
-        seen.add(folded)
-        payload = _blob(lambda p=package, r=install_root: backend.capture_package(p.package_id, r),
-                        MAX_MEMBER_BYTES, f"payload {package.package_id}")
-        xattrs = _blob(lambda p=package, r=install_root: backend.dump_xattrs(p.package_id, r),
-                       MAX_XATTR_MANIFEST_BYTES, f"xattr manifest {package.package_id}")
-        payload_name = f"{package.package_id}.payload.tar"
-        xattr_name = f"{package.package_id}.xattrs.json"
-        blobs[payload_name] = payload.data
-        blobs[xattr_name] = xattrs.data
-        device_hashes[f"payload/{package.package_id}.tar"] = _device_digest(payload)
-        device_hashes[f"xattrs/{package.package_id}.json"] = _device_digest(xattrs)
-        spec_packages.append({
-            "packageId": package.package_id,
-            "installRoot": install_root,
-            "payload": payload_name,
-            "xattrManifest": xattr_name,
-        })
-
-    registry_changes = []
-    for item in request.registry:
-        if not is_identifier(item.app_id):
-            raise CaptureRefused("registry change names an invalid app id")
-        if not item.fields:
-            raise CaptureRefused(f"registry change for {item.app_id} lists no fields")
-        fields = {}
-        for field, applied in item.fields.items():
-            if type(applied) is not str:
-                raise CaptureRefused(f"registry intent for {item.app_id}.{field} is not a string")
-            before = _read_value(lambda a=item.app_id, f=field: backend.read_registry_field(a, f),
-                                 f"registry {item.app_id}.{field}")
-            fields[field] = {"before": before, "applied": applied}
-        registry_changes.append({"appId": item.app_id, "fields": fields})
-
-    system_keys = []
-    for item in request.system_keys:
-        if type(item.expected_current) is not str:
-            raise CaptureRefused("system key intent is not a string")
-        original = _read_value(lambda k=item.key: backend.read_system_key(k), f"system key {item.key}")
-        system_keys.append({
-            "key": item.key,
-            "original": original,
-            "expectedCurrent": item.expected_current,
-        })
-
-    our_packages = [{"packageId": pid} for pid in request.our_packages]
-
-    spec = {
-        "schema": _SPEC_SCHEMA,
-        "packages": spec_packages,
-        "registryChanges": registry_changes,
-        "systemKeys": system_keys,
-        "ourPackages": our_packages,
-    }
-
-    # Everything is built and proven in a temporary folder that is removed. Only a
-    # capsule that passes the gate is moved into owner storage, so a refusal at any
-    # step leaves owner storage untouched. The repository and the device are never
-    # written to.
-    with tempfile.TemporaryDirectory(prefix="tvkit-capture-") as scratch:
-        scratch_dir = Path(scratch)
-        src = scratch_dir / "src"
+    staging: Path | None = None
+    published = False
+    try:
+        staging = Path(tempfile.mkdtemp(prefix=f".{out.name}.tvkit-staging-", dir=out.parent))
+        src = staging / "src"
         src.mkdir()
-        for name, data in blobs.items():
-            check_relative(name, "capture working file")
-            with open(src / name, "xb") as handle:
-                handle.write(data)
+
+        device_hashes: dict[str, str] = {}
+        spec_packages = []
+        for package, install_root in validated_packages:
+            payload_name = f"{package.package_id}.payload.tar"
+            xattr_name = f"{package.package_id}.xattrs.json"
+            payload_path = src / payload_name
+            xattr_path = src / xattr_name
+            payload = _stage_blob(
+                backend.capture_package(package.package_id, install_root, max_bytes=MAX_MEMBER_BYTES),
+                payload_path, MAX_MEMBER_BYTES, f"payload {package.package_id}")
+            xattrs = _stage_blob(
+                backend.dump_xattrs(package.package_id, install_root, max_bytes=MAX_XATTR_MANIFEST_BYTES),
+                xattr_path, MAX_XATTR_MANIFEST_BYTES, f"xattr manifest {package.package_id}")
+            device_hashes[f"payload/{package.package_id}.tar"] = _device_digest(payload, payload_path)
+            device_hashes[f"xattrs/{package.package_id}.json"] = _device_digest(xattrs, xattr_path)
+            spec_packages.append({
+                "packageId": package.package_id,
+                "installRoot": install_root,
+                "payload": payload_name,
+                "xattrManifest": xattr_name,
+            })
+
+        registry_changes = []
+        for item in request.registry:
+            fields = {}
+            for field in item.fields:
+                before = _read_value(lambda a=item.app_id, f=field: backend.read_registry_field(a, f),
+                                     f"registry {item.app_id}.{field}")
+                fields[field] = {"before": before, "applied": item.fields[field]}
+            registry_changes.append({"appId": item.app_id, "fields": fields})
+
+        system_keys = []
+        for item in request.system_keys:
+            original = _read_value(lambda k=item.key: backend.read_system_key(k), f"system key {item.key}")
+            system_keys.append({
+                "key": item.key,
+                "original": original,
+                "expectedCurrent": item.expected_current,
+            })
+
+        # The identity must not have changed under us during the capture.
+        after = backend.read_device_facts()
+        if not isinstance(after, Mapping):
+            raise CaptureRefused("backend device facts must be a mapping")
+        try:
+            after_parsed = parse_device_facts(dict(after))
+        except ProfileError as exc:
+            raise CaptureRefused(f"device facts changed to an invalid shape during capture: {exc}") from exc
+        if after_parsed != parsed_facts:
+            raise CaptureRefused("device identity or fingerprint changed during capture; refusing")
+
+        spec = {
+            "schema": _SPEC_SCHEMA,
+            "packages": spec_packages,
+            "registryChanges": registry_changes,
+            "systemKeys": system_keys,
+            "ourPackages": [{"packageId": pid} for pid in request.our_packages],
+        }
         spec_path = src / "assemble-spec.json"
         with open(spec_path, "x", encoding="utf-8", newline="\n") as handle:
             handle.write(json.dumps(spec, indent=2))
-        built = scratch_dir / "capsule"
-        # assemble runs the full capsule validator (traversal, symlink escape,
-        # byte and metadata cross-checks) and writes the capsule into scratch.
-        _assemble.assemble(spec_path, profile, parsed_facts, built)
-        # The proof: the TV's own digests against the assembled bytes.
-        gate = readback_gate(built, device_hashes, parsed_facts, baseline=baseline)
-        # Proven: place it into owner storage as the last step.
-        shutil.move(str(built), str(out))
 
-    return CaptureResult(capsule_dir=str(out), baseline=gate.baseline, gate=gate)
+        built = staging / "capsule"
+        # assemble runs the full capsule validator (traversal, symlink escape,
+        # byte and metadata cross-checks) and writes the capsule into staging.
+        _assemble.assemble(spec_path, profile, parsed_facts, built)
+        # Gate the staged copy, so a mutated transfer or a bad baseline is refused
+        # before owner storage is ever created.
+        readback_gate(built, device_hashes, parsed_facts, baseline=baseline)
+
+        # Publish by a same-volume rename, then prove the ACTUAL owner-storage copy.
+        _publish(built, out)
+        published = True
+        gate = readback_gate(out, device_hashes, parsed_facts, baseline=baseline)
+        return CaptureResult(capsule_dir=str(out), baseline=gate.baseline, gate=gate)
+    except BaseException:
+        # Remove only what this operation created: the published output (if any)
+        # and the staging folder. A preexisting or raced destination is untouched.
+        if published:
+            shutil.rmtree(out, ignore_errors=True)
+        raise
+    finally:
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
