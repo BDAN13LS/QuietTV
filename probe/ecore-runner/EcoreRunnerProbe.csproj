@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- On-TV validation probe for the Ecore-native stop/launch runner. Compiles the SHIPPED
+       launcher/host/CommandLifecycle.cs so it drives the REAL EcoreCommandRunner, not a copy. -->
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>EcoreRunnerProbe</AssemblyName>
+    <UseAppHost>false</UseAppHost>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <UseSharedCompilation>false</UseSharedCompilation>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\launcher\host\CommandLifecycle.cs" Link="CommandLifecycle.cs" />
+  </ItemGroup>
+</Project>

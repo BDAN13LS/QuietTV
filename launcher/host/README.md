@@ -66,8 +66,10 @@ token ships here.
 - **Other launch ids:** remote, web actions and `launch.request` accept only catalogue ids and the two Samsung system ids.
 - **Unreadable owner files:** an `apps.json` or `settings.json` that cannot be read is rejected cleanly with `config_rejected=`.
 
-Every native process uses `ProcessStartInfo.ArgumentList` with `UseShellExecute=false`
-and goes through one `IProcessStarter`.
+Production child processes are owned by Ecore. Short app commands have bounded
+output and deadlines; long-lived web/IPTV helpers use `IHelperStarter` and stay alive
+until they exit or are closed. Both paths validate the executable and arguments for
+direct execution. The controller does not wait on managed child processes in its UI loop.
 
 ## Building (offline)
 
@@ -117,3 +119,17 @@ release gate; this candidate is not a production installation path.
 - **Signing:** no packaging or signing.
 - **Firmware gates:** firmware and model gates are left to the future Helper.
 - **Excluded binary:** `QuietIPTV.dll` is not included. The IPTV and web viewer paths stay off unless an owner supplies it and enables them.
+
+## Process reliability checks
+
+The shared native adapters were tested on the supported TV on October 28, 2026:
+the command probe passed 142 checks and the long-lived helper probe passed 19.
+The private controller using those adapters recovered when its actual IPTV helper
+exited and then restarted/closed the helper without restarting the controller.
+These are process-lifecycle checks; they do not prove IPTV picture or sound,
+public installation, or cold-boot behavior.
+
+The portable public host also has offline build, lifecycle and guard-removal tests.
+See [the isolated probe](../../probe/ecore-runner/README.md) for the on-device
+checks. Probe sources and pure offline checks are public; build outputs and owner
+logs are excluded.

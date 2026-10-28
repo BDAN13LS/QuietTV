@@ -20,7 +20,17 @@ internal static class SelfTest {
   public void StartWebUi(bool hidden)=>Calls.Add("webui");
   public void Log(string line){}
  }
- sealed class RecordingStarter : IProcessStarter {internal readonly List<ProcessStartInfo> Calls=new();public Process Start(ProcessStartInfo info){Calls.Add(info);return null;}}
+ // Records each long-lived-helper spawn (exe + args) and returns a fake handle, so the self-test proves a
+ // disabled feature never reaches the starter and an enabled one spawns once with the exact arguments --
+ // and never owns a real Process.
+ sealed class RecordingStarter : IHelperStarter {
+  internal readonly List<(string Exe,string[] Args)> Calls=new();
+  public ILongLivedHelper Start(string exe,IReadOnlyList<string> args){Calls.Add((exe,args.ToArray()));return new FakeHelper();}
+ }
+ sealed class FakeHelper : ILongLivedHelper {
+  public bool Started=>true;public bool Alive=>true;public int Pid=>4242;
+  public string[] DrainLines()=>Array.Empty<string>();public void Kill(){}public void Dispose(){}
+ }
  sealed class MemorySessionFiles : ISessionFiles {
   internal readonly Dictionary<string,string> Files=new();internal readonly List<string> Ops=new();
   public bool Exists(string path){Ops.Add("exists:"+path);return Files.ContainsKey(path);}
@@ -33,7 +43,7 @@ internal static class SelfTest {
 
  internal static int Run(){
   try{
-   State.Tests();RemoteGate.Tests();WebFrontend.Tests();
+   State.Tests();RemoteGate.Tests();WebFrontend.Tests();CommandLifecycleTests.Run();
    var cfg=HostConfig.Parse(ValidConfig);IptvSession.Tests(cfg);
    ConfigTests(cfg);OwnerDataTests(cfg);StartupTests(cfg);LaunchTests(cfg);ProcessGateTests(cfg);InputLayoutTests();
    Console.WriteLine("PASS "+count+" host seam assertions");Console.WriteLine("SELF-TEST PASS");return 0;
@@ -129,8 +139,8 @@ internal static class SelfTest {
   try{new IptvSession(onCfg,onStarter,mem).Start();}catch(InvalidOperationException){}
   try{new WebFrontend(onCfg,onStarter,mem).Start(true);}catch(InvalidOperationException){}
   Check(onStarter.Calls.Count==2,"positive control: both starters reached once each when both are enabled");
-  var a=onStarter.Calls[0];Check(a.FileName=="/usr/bin/dotnet"&&!a.UseShellExecute&&a.ArgumentList.SequenceEqual(new[]{onCfg.IptvDll}),"IPTV start uses an exact argument list under the root");
-  var b=onStarter.Calls[1];Check(b.FileName=="/usr/bin/dotnet"&&!b.UseShellExecute&&b.ArgumentList.SequenceEqual(new[]{onCfg.IptvDll,"--dashboard","--start-hidden"}),"Web UI start uses an exact argument list");
+  var a=onStarter.Calls[0];Check(a.Exe=="/usr/bin/dotnet"&&a.Args.SequenceEqual(new[]{onCfg.IptvDll}),"IPTV start uses an exact argument list under the root");
+  var b=onStarter.Calls[1];Check(b.Exe=="/usr/bin/dotnet"&&b.Args.SequenceEqual(new[]{onCfg.IptvDll,"--dashboard","--start-hidden"}),"Web UI start uses an exact argument list");
   Check(mem.Files.Count==0&&mem.Ops.Contains("delete:"+onCfg.PathIn("iptv-status.json"))&&mem.Ops.Contains("delete:"+onCfg.PathIn("ui-action.request")),"stale-session cleanup goes through the session-file seam (memory only)");
  }
 

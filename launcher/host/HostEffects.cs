@@ -1,10 +1,14 @@
 // Seams between the host's decisions and the native side effects they cause.
 // Program.Main runs HostStartup.Run with NativeHostEffects; --self-test runs the same
 // code with a recording fake, so a feature that is off is proven not to start.
-using System.Diagnostics;
 
-internal interface IProcessStarter {Process Start(ProcessStartInfo info);}
-internal sealed class SystemProcessStarter : IProcessStarter {public Process Start(ProcessStartInfo info)=>Process.Start(info);}
+// The long-lived IPTV/web helpers are spawned through this seam, which returns an Ecore-native handle
+// (ILongLivedHelper) and NOT a System.Diagnostics.Process: a .NET-owned long-lived child that exits while
+// the ecore loop pumps aborts the controller (ProcessWaitState vs ecore SIGCHLD -> SIGABRT). Production
+// uses EcoreHelperRunner (ecore_exe, no .NET Process); the self-test drives a recording fake. See the
+// Ecore-native long-lived helper in CommandLifecycle.cs.
+internal interface IHelperStarter {ILongLivedHelper Start(string exe,IReadOnlyList<string> args);}
+internal sealed class EcoreHelperStarter : IHelperStarter {public ILongLivedHelper Start(string exe,IReadOnlyList<string> args)=>EcoreHelperRunner.Start(exe,args);}
 
 // Every IPTV/web-viewer session file (and /proc identity read) goes through this, so the
 // self-test can drive the real sessions against memory only and never touch the disk.

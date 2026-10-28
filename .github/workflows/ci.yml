@@ -86,6 +86,15 @@ jobs:
           python -m unittest discover -s tests -p test_tv_inspector.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Compile isolated Ecore probe and run its pure FD comparator
+        shell: pwsh
+        run: |
+          dotnet build probe/ecore-runner/EcoreRunnerProbe.csproj -c Release -o probe/ecore-runner/bin/ci --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet probe/ecore-runner/bin/ci/EcoreRunnerProbe.dll fd-selftest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+
   public-source-guard:
     name: Public source guard
     runs-on: ubuntu-24.04
