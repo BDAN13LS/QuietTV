@@ -64,6 +64,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -378,17 +379,79 @@ def _read_value(backend_call, what: str) -> str:
     return value
 
 
-def _publish(staged_capsule: Path, out: Path) -> None:
-    """Place the staged capsule at ``out`` by a same-volume rename, never
-    overwriting a preexisting or raced destination.
+def _inside(child: Path, parent: Path) -> bool:
+    """True if ``child`` is ``parent`` or lives under it (case-normalised, absolute)."""
+    try:
+        c = os.path.normcase(os.path.abspath(child))
+        p = os.path.normcase(os.path.abspath(parent))
+        return os.path.commonpath([c, p]) == p
+    except ValueError:  # different drives
+        return False
 
-    Staging lives under ``out``'s parent, so this is a same-volume rename: no
-    cross-volume copy, so no partial or corrupting copy happens here. If a
-    destination has appeared since the early check, it is left untouched.
+
+def _require_outside_any_repo(out: Path) -> None:
+    """Refuse owner storage inside THIS repository or ANY git checkout/worktree.
+
+    Reuses the proven ``helper/owner_init.check_outside_repos`` policy: it checks
+    the path and its symlink-resolved real path for containment in this repo, and
+    walks every ancestor for a ``.git`` entry -- a directory OR the FILE marker a
+    git worktree uses (``os.path.lexists`` catches both). Without this, a capture
+    in a worktree could land in the parent repo or another checkout and risk the
+    owner's stock data being committed. Runs before any backend read or output
+    creation.
     """
-    if out.exists() or out.is_symlink():
-        raise CaptureRefused("owner storage destination appeared before publication; refusing to overwrite")
-    os.rename(staged_capsule, out)
+    real = Path(os.path.realpath(out))
+    for candidate in (out, real):
+        for root in (str(REPO_ROOT), os.path.realpath(REPO_ROOT)):
+            if _inside(candidate, Path(root)):
+                raise CaptureRefused("owner storage must be outside the repository; refusing")
+        for ancestor in [candidate, *candidate.parents]:
+            if os.path.lexists(ancestor / ".git"):
+                raise CaptureRefused("owner storage is inside a git checkout/worktree; refusing")
+
+
+def _publish(staged_capsule: Path, out: Path) -> tuple[int, int]:
+    """Reserve ``out`` exclusively, then populate it; never replace an existing entry.
+
+    ``os.rename`` is NOT a no-overwrite operation: on POSIX it silently replaces an
+    EMPTY destination directory created in the race after an earlier existence
+    check (Windows rejects it, but the public CLI/CI also runs on Linux). So this
+    does not rely on rename to avoid clobbering. Instead ``os.mkdir`` is an atomic
+    create-or-fail on both platforms: if anything -- empty or populated -- is
+    already at ``out``, it raises ``FileExistsError`` and we refuse, leaving the
+    raced destination untouched. The staged capsule lives under ``out``'s parent,
+    so each member then moves into the reserved directory by a same-volume rename.
+
+    Returns the ``(st_dev, st_ino)`` identity of the directory this call created,
+    so cleanup can prove it is removing its own output and not a later replacement.
+    """
+    if out.is_symlink():
+        raise CaptureRefused("owner storage destination is a symlink; refusing")
+    try:
+        os.mkdir(out)
+    except FileExistsError:
+        raise CaptureRefused(
+            "owner storage destination appeared before publication; refusing to overwrite") from None
+    created = os.lstat(out)
+    for child in sorted(os.listdir(staged_capsule)):
+        os.rename(staged_capsule / child, out / child)
+    return (created.st_dev, created.st_ino)
+
+
+def _remove_created_output(out: Path, identity: tuple[int, int]) -> None:
+    """Remove the output this operation created -- only if it is still that exact
+    directory. If a replacement with a different inode took its place during
+    validation, or it is now a symlink, leave it untouched rather than deleting an
+    unrelated directory."""
+    try:
+        current = os.lstat(out)
+    except OSError:
+        return
+    if stat.S_ISLNK(current.st_mode):
+        return
+    if (current.st_dev, current.st_ino) != identity:
+        return
+    shutil.rmtree(out, ignore_errors=True)
 
 
 # --------------------------------------------------------------------------
@@ -419,9 +482,7 @@ def capture_backup(
     preexisting or raced destination is preserved. Never writes to a device.
     """
     out = Path(out_dir)
-    resolved_out = out.resolve()
-    if resolved_out == REPO_ROOT or REPO_ROOT in resolved_out.parents:
-        raise CaptureRefused("owner storage must be outside the repository; refusing")
+    _require_outside_any_repo(out)
     if out.exists() or out.is_symlink():
         raise CaptureRefused("owner storage folder must not exist yet")
     if not out.parent.is_dir() or out.parent.is_symlink():
@@ -434,7 +495,7 @@ def capture_backup(
     validated_packages = _validate_request(profile, request)
 
     staging: Path | None = None
-    published = False
+    created_identity: tuple[int, int] | None = None
     try:
         staging = Path(tempfile.mkdtemp(prefix=f".{out.name}.tvkit-staging-", dir=out.parent))
         src = staging / "src"
@@ -510,16 +571,16 @@ def capture_backup(
         # before owner storage is ever created.
         readback_gate(built, device_hashes, parsed_facts, baseline=baseline)
 
-        # Publish by a same-volume rename, then prove the ACTUAL owner-storage copy.
-        _publish(built, out)
-        published = True
+        # Reserve and populate the output, then prove the ACTUAL owner-storage copy.
+        created_identity = _publish(built, out)
         gate = readback_gate(out, device_hashes, parsed_facts, baseline=baseline)
         return CaptureResult(capsule_dir=str(out), baseline=gate.baseline, gate=gate)
     except BaseException:
-        # Remove only what this operation created: the published output (if any)
-        # and the staging folder. A preexisting or raced destination is untouched.
-        if published:
-            shutil.rmtree(out, ignore_errors=True)
+        # Remove only what this operation created: the output we reserved (if any,
+        # and only while it is still that exact directory) and the staging folder.
+        # A preexisting, raced, or replaced destination is left untouched.
+        if created_identity is not None:
+            _remove_created_output(out, created_identity)
         raise
     finally:
         if staging is not None:

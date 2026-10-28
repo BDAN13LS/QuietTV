@@ -11,6 +11,7 @@ import ast
 import hashlib
 import inspect
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import test_public_toolkit_fixtures as fx  # noqa: E402
 from tvkit import capture, transport  # noqa: E402
+from tvkit.backup import ReadbackRefused  # noqa: E402
 from tvkit.capsule import CapsuleError  # noqa: E402
 from tvkit.capture import (  # noqa: E402
     BASE_CAPABILITIES, CAP_REGISTRY, CAP_SYSTEM_KEY, CaptureBackend, CaptureRefused, CaptureRequest,
@@ -484,6 +486,27 @@ class OwnerStorage(CaptureCase):
         self.assertIn("must not exist yet", str(ctx.exception))
         self.assertEqual(list(self.out.iterdir()), [], "a refusal wrote into the existing folder")
 
+    def test_refuses_inside_another_git_repository(self):
+        # A synthetic unrelated checkout: a .git directory makes this a repo root.
+        repo = self.tmp / "other-repo"
+        (repo / ".git").mkdir(parents=True)
+        backend = FakeBackend()
+        with self.assertRaises(CaptureRefused) as ctx:
+            self.run_capture(backend=backend, out=repo / "capsule")
+        self.assertIn("git checkout/worktree", str(ctx.exception))
+        self.assertFalse((repo / "capsule").exists())
+        self.assertEqual(backend.calls, [], "a backend read ran before the repository check")
+
+    def test_refuses_inside_a_git_worktree_marker(self):
+        # A linked worktree carries a .git FILE ("gitdir: ...") rather than a dir.
+        wt = self.tmp / "worktree"
+        wt.mkdir()
+        (wt / ".git").write_text("gitdir: /somewhere/.git/worktrees/wt\n", encoding="utf-8")
+        with self.assertRaises(CaptureRefused) as ctx:
+            self.run_capture(out=wt / "capsule")
+        self.assertIn("git checkout/worktree", str(ctx.exception))
+        self.assertFalse((wt / "capsule").exists())
+
 
 class Publication(CaptureCase):
     """Defect (1): the proof is the ACTUAL owner-storage copy, and cleanup is scoped."""
@@ -494,11 +517,12 @@ class Publication(CaptureCase):
         real_publish = capture._publish
 
         def corrupt_publish(staged, out):
-            real_publish(staged, out)
+            identity = real_publish(staged, out)
             victim = out / "payload" / "org.example.alpha.tar"
             data = bytearray(victim.read_bytes())
             data[-1] ^= 0x01
             victim.write_bytes(data)
+            return identity
 
         with mock.patch.object(capture, "_publish", corrupt_publish):
             with self.assertRaises(CapsuleError) as ctx:
@@ -538,6 +562,43 @@ class Publication(CaptureCase):
         self.assertIn("refusing to overwrite", str(ctx.exception))
         self.assertTrue(self.out.exists(), "a raced destination we did not create was deleted")
         self.assertEqual((self.out / "racer.txt").read_text(encoding="utf-8"), "not mine")
+        self.assertNoStagingLeft()
+
+    def test_raced_empty_destination_is_preserved(self):
+        # os.rename would silently replace an EMPTY raced directory on POSIX; the
+        # os.mkdir reservation refuses it instead and leaves it untouched.
+        real_publish = capture._publish
+
+        def racer(staged, out):
+            out.mkdir()  # an empty directory races in after the early check
+            return real_publish(staged, out)
+
+        with mock.patch.object(capture, "_publish", racer):
+            with self.assertRaises(CaptureRefused) as ctx:
+                self.run_capture()
+        self.assertIn("refusing to overwrite", str(ctx.exception))
+        self.assertTrue(self.out.is_dir(), "a raced empty destination was replaced or deleted")
+        self.assertEqual(list(self.out.iterdir()), [], "a refused publish wrote into the raced directory")
+        self.assertNoStagingLeft()
+
+    def test_cleanup_preserves_a_replaced_output(self):
+        # If an unrelated directory replaces our output between publication and the
+        # final readback, cleanup must not delete it: it is not the output we made.
+        real_gate = capture.readback_gate
+
+        def gate(stored_path, device_hashes, facts, *, baseline="current-state"):
+            if Path(stored_path) == self.out:
+                shutil.rmtree(self.out)
+                self.out.mkdir()  # a different directory (new inode) takes the name
+                (self.out / "REPLACEMENT.txt").write_text("unrelated", encoding="utf-8")
+                raise ReadbackRefused("synthetic post-publish refusal")
+            return real_gate(stored_path, device_hashes, facts, baseline=baseline)
+
+        with mock.patch.object(capture, "readback_gate", gate):
+            with self.assertRaises(CapsuleError):
+                self.run_capture()
+        self.assertTrue(self.out.exists(), "the replacement directory was deleted")
+        self.assertEqual((self.out / "REPLACEMENT.txt").read_text(encoding="utf-8"), "unrelated")
         self.assertNoStagingLeft()
 
 

@@ -113,21 +113,33 @@ operation created are removed on a refusal, so **a refusal leaves owner storage
   allowlist, a no-op change);
 - a payload with path traversal or a symlink escaping the package root — refused
   by the capsule validator, not re-implemented here;
-- owner storage inside the repository, already existing, or without a real
-  parent folder; a destination that appears before publication (never overwritten);
+- owner storage inside this repository or any other git checkout/worktree,
+  already existing, or without a real parent folder; a destination that appears
+  before publication (never overwritten, empty or populated);
 - corruption introduced during publication — caught by the readback of the
-  **actual owner-storage copy**;
+  **actual owner-storage copy**; on that refusal a directory that replaced the
+  output is preserved, not deleted;
 - an invalid baseline label, or a `stock` label the gate can contradict.
 
 ## Boundaries
 
 - **Zero TV writes, zero repository writes.** The backend only reads. The engine
-  stages under the owner-storage parent and publishes the proven capsule by a
-  **same-volume rename** (no cross-volume copy that could corrupt silently);
-  its staging folder is removed, and it removes only the output it created.
-- Owner storage must be a path **outside this repository**. The capsule folder
-  must not already exist, and a destination that races in before publication is
-  never overwritten.
+  stages under the owner-storage parent and publishes the proven capsule into an
+  **exclusively reserved** output: `os.mkdir` is an atomic create-or-fail on both
+  POSIX and Windows, so a destination that races in before publication — empty or
+  populated — is refused, never overwritten. (Plain `os.rename` is *not* a
+  no-overwrite operation: on POSIX it silently replaces an empty target directory,
+  so it is not relied on for this.) Each member then moves into the reserved
+  directory by a same-volume rename. The staging folder is removed; the engine
+  removes only the output it created, and only while that is still the exact
+  directory it made — a replacement with a different inode, or a symlink, is left
+  untouched.
+- Owner storage must be a path **outside this repository and outside any other git
+  checkout or worktree** (the proven `owner_init.check_outside_repos` policy:
+  resolved-path containment plus an ancestor `.git` directory *or* worktree file
+  marker), checked before any backend read, so a capture in a worktree can never
+  land in the parent repo and risk the owner's stock data being committed. The
+  capsule folder must not already exist.
 - The baseline is **declared**, not device-proven (same limit as the readback
   gate): capsule/1 cannot show packages removed before capture, so `stock` is a
   claim the gate can only contradict, never confirm.
@@ -157,8 +169,13 @@ written outside owner storage; and every refusal above. Targeted behavioural
 tests cover the four review defects:
 
 - **destination-copy corruption** — a patched `_publish` flips a byte after the
-  same-volume rename; the readback of the actual owner copy refuses, the corrupt
-  copy is cleaned, and a sibling and a raced destination are preserved;
+  rename; the readback of the actual owner copy refuses, the corrupt copy is
+  cleaned, and a sibling is preserved. A raced populated destination and a raced
+  **empty** destination are both preserved (the reservation refuses them), and a
+  directory that replaces the output before the final readback is preserved on the
+  refusal (cleanup proves inode identity first). Owner storage inside a synthetic
+  git repo and inside a worktree `.git` file marker are both refused before any
+  read;
 - **bounded lazy transfer** — tiny-chunk success, the transfer iterator closed on
   a refusal, the per-chunk cap, and an oversize declared size refused before any
   bytes are read;
