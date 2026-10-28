@@ -33,7 +33,7 @@ internal static class SelfTest {
 
  internal static int Run(){
   try{
-   State.Tests();RemoteGate.Tests();WebFrontend.Tests();
+   State.Tests();RemoteGate.Tests();WebFrontend.Tests();CommandLifecycleTests.Run();
    var cfg=HostConfig.Parse(ValidConfig);IptvSession.Tests(cfg);
    ConfigTests(cfg);OwnerDataTests(cfg);StartupTests(cfg);LaunchTests(cfg);ProcessGateTests(cfg);InputLayoutTests();
    Console.WriteLine("PASS "+count+" host seam assertions");Console.WriteLine("SELF-TEST PASS");return 0;

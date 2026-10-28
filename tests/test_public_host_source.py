@@ -22,8 +22,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 HOST = REPO / "launcher" / "host"
 SCRIPT = REPO / "tools" / "build-public-host.ps1"
-SOURCES = ["Canvas.cs", "HostConfig.cs", "HostEffects.cs", "IptvSession.cs", "Native.cs",
-           "Program.cs", "RemoteGate.cs", "SelfTest.cs", "State.cs", "WebFrontend.cs"]
+SOURCES = ["Canvas.cs", "CommandLifecycle.cs", "HostConfig.cs", "HostEffects.cs", "IptvSession.cs",
+           "Native.cs", "Program.cs", "RemoteGate.cs", "SelfTest.cs", "State.cs", "WebFrontend.cs"]
 UPSTREAM = "4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b"
 OLD_ROOT = "/home/owner/share/tmp/sdk_tools/quiet-tv"
 BUILD_FILES = ["QuietTVHost.csproj", "NuGet.Config", "global.json"]
@@ -83,6 +83,84 @@ class SourceShape(unittest.TestCase):
             if name != "HostEffects.cs":  # SystemProcessStarter is the single spawn point
                 self.assertNotRegex(code, r"Process\.Start\(", f"{name} must spawn through IProcessStarter")
         self.assertNotIn("Directory.CreateDirectory", _code("Program.cs"))
+
+    def test_app_command_runner_is_nonblocking_and_bounded(self):
+        # The UI-thread freeze was ReadToEnd()+WaitForExit() with no timeout. The launch path must no
+        # longer block: no synchronous pipe drain, no unbounded wait, and the spawn goes through the seam.
+        program = _code("Program.cs")
+        for call in ("ReadToEnd(", ".WaitForExit();", "new ProcessStartInfo("):
+            self.assertNotIn(call, program, f"{call} still on the ecore launch path in Program.cs")
+        runner = _code("CommandLifecycle.cs")
+        self.assertNotIn(".Kill(true)", runner, "the runner must never kill the process tree")
+        self.assertNotIn("BeginOutputReadLine", runner, "line-buffered readback is unbounded for output with no newline")
+        self.assertNotIn("Process.Start(", runner, "the shared runner spawns through an injected starter, not Process.Start")
+        for constant in ("DefaultDeadlineMs=2500", "StdoutCap=65536", "StderrCap=16384"):
+            self.assertIn(constant, runner, f"bounded threshold {constant} missing")
+        # The queue and its generation gate are what drop stale completions after Home (no late launch).
+        for token in ("class CommandQueue", "void Cancel()", "bool fresh=run.Gen==gen;"):
+            self.assertIn(token, runner, f"{token} missing from the bounded command queue")
+        # Issue 1: no worker exception escapes the thread (both the inner catch and the Begin backstop exist,
+        # with DIFFERENT prefixes so the guard-off mutant is detectable).
+        for token in ('worker_error="+e.Message', 'worker_crash="+e.Message'):
+            self.assertIn(token, runner, f"{token} missing -- a worker exception could escape and kill the controller")
+        # Issue 3: the hard reader-slot budget and its graceful reject.
+        for token in ("MaxLiveReaders", "int LiveReaders", "rejected_reader_budget", "void ReaderStarted()", "void ReaderEnded()"):
+            self.assertIn(token, runner, f"{token} missing -- the live-reader hard cap is not enforced")
+        # Issue 2: the single-owner launch fence lives in the shared file, not as loose statics.
+        for token in ("class LaunchOwner", "bool TrySubmit(int token)", "bool ConsumeHandoff(int token)", "void Retire()"):
+            self.assertIn(token, runner, f"{token} missing -- the launch-owner timer fence is absent")
+
+    def test_production_startcommand_selects_the_ecore_adapter(self):
+        # The crash was a .NET Process waited on under an active ecore loop (ProcessWaitState vs ecore
+        # SIGCHLD -> SIGABRT). Production must spawn through the Ecore-native adapter and own NO .NET
+        # Process on the command path, in the public host. The private controller is checked in its own checkout.
+        for label, program in (("launcher/host", _code("Program.cs")),):
+            self.assertIn("static CommandRun StartCommand(CommandSpec spec)=>EcoreCommandRunner.Begin(spec);", program,
+                          f"{label}: production StartCommand must use the Ecore-native adapter")
+            self.assertNotIn("new RealChild(", program, f"{label}: no .NET Process child on the production command path")
+            self.assertNotIn(".Start(spec.Info)", program, f"{label}: no .NET Process.Start on the production command path")
+        runner = _code("CommandLifecycle.cs")
+        # The Ecore-native runner spawns via ecore_exe (no .NET Process) and kills the exact pid itself
+        # (not ecore_exe_kill, which arms a 10 s SIGKILL timer) through ONE identity-guarded helper,
+        # KillExact, which signals only on an exact /proc start-time match and reports success so the run
+        # records Killed only when the signal really landed (MarkKilled).
+        for token in ("static class EcoreCommandRunner", "sealed class EcoreCommand", "static class CommandArgs",
+                      "ecore_exe_pipe_run", "ECORE_EXE_PIPE_READ", "ParseStartTime", "IdentityMatches",
+                      "static bool KillExact", "kill((int)pid,SIGKILL)==0", "cmd.MarkKilled()", "MarkKilled(){killed=true;}"):
+            self.assertIn(token, runner, f"{token} missing from the Ecore-native runner")
+        # Deadline no longer pre-sets Killed; it is recorded only after a successful kill.
+        self.assertNotIn("timedOut=true;killed=true;return true;", runner,
+                         "Deadline() must not claim Killed before the signal succeeds")
+        # Fail-closed init: all handlers must register (HandlersOk) and Begin must not spawn after a failed init.
+        self.assertIn("HandlersOk", runner, "init must validate all handler registrations (fail closed)")
+        self.assertIn('if(!EnsureInit())', runner, "Begin must not spawn after a failed init")
+        self.assertNotIn("Process.Start(", runner, "the Ecore-native runner must not spawn a .NET Process")
+        # Must kill the exact pid via libc, never bind/call ecore_exe_kill/terminate (they arm a 10 s
+        # doomsday SIGKILL timer). The regex matches an extern binding, not the explanatory comment.
+        self.assertNotRegex(runner, r"extern\s+\w+\s+ecore_exe_(kill|terminate)",
+                            "must not bind ecore_exe_kill/terminate")
+        self.assertRegex(runner, r'DllImport\("libc"[^)]*\)\]\s*static extern int kill\(',
+                         "must kill the exact pid through libc kill()")
+
+    def test_launch_timers_are_generation_fenced_in_both_programs(self):
+        # The Home->new-launch race is fenced by a per-launch token carried in each timer's data pointer.
+        # An old timer scheduled with IntPtr.Zero would never match a live token (tokens start at 1) -- but it
+        # would also mean the call site forgot to pass the token, so forbid the bare-Zero launch-timer sites
+        # and require the owner calls, in the public host. The private controller is checked in its own checkout.
+        for label, program in (("launcher/host", _code("Program.cs")),):
+            self.assertNotIn("LaunchSubmit,IntPtr.Zero", program, f"{label}: launch-submit timer must carry its owner token, not IntPtr.Zero")
+            self.assertNotIn("LaunchWatch,IntPtr.Zero", program, f"{label}: foreground-watch timer must carry its owner token, not IntPtr.Zero")
+            self.assertNotIn("launchSubmitted", program, f"{label}: the loose launch flags are replaced by LaunchOwner")
+            self.assertNotIn("launchHandedOff", program, f"{label}: the loose launch flags are replaced by LaunchOwner")
+            self.assertEqual(program.count("launchOwner.Begin()"), 1, f"{label}: exactly one launch claims a token")
+            self.assertEqual(program.count("launchOwner.Retire()"), 4, f"{label}: Home, Dismiss, the web-hide-timeout abort and a failed launch retire the owner")
+            self.assertIn("launchOwner.Owns(d.ToInt32())", program, f"{label}: CheckLaunch is token-fenced")
+            self.assertIn("launchOwner.Owns(tok)", program, f"{label}: SubmitLaunch is token-fenced")
+            # The launch is enqueued ONLY inside the owner's TrySubmit gate (no duplicate on a stale timer),
+            # the handoff is consumed under the token, and the hand-off is fenced to the launch's own token.
+            self.assertIn("if(launchOwner.TrySubmit(tok)){commands.Enqueue(", program, f"{label}: the launch enqueue is gated by TrySubmit")
+            self.assertIn("launchOwner.ConsumeHandoff(tok)", program, f"{label}: the handoff is consumed under the launch token")
+            self.assertIn("launchOwner.HandOff(spec.OwnerToken)", program, f"{label}: the command handoff carries the launch's token")
 
     def test_main_validates_before_writes_and_native_calls(self):
         main = _code("Program.cs").split("static int Main(", 1)[1]
@@ -181,6 +259,7 @@ class OfflineBuild(unittest.TestCase):
                      "SELF-TEST PASS", "BUILD-PUBLIC-HOST OK"):
             self.assertIn(line, out)
         self.assertRegex(out, r"PASS \d{3,} host seam assertions")
+        self.assertRegex(out, r"PASS \d+ command lifecycle assertions")
         self.assertFalse((HOST / "obj").exists(), "intermediate caches left behind")
 
     def test_output_has_no_absolute_host_paths(self):
@@ -487,6 +566,65 @@ GUARDS = {
                             "stale-session cleanup goes through the session-file seam (memory only)"),
     "inputs-tile": ("HostEffects.cs", "if(id==InputsTileId)return LaunchRoute.Rejected;", "",
                     "synthetic Inputs tile id is refused even if the catalogue lists it"),
+    # Remove the whole-command deadline: a child that never drains its pipe hangs the worker, which the
+    # in-test watchdog detects (the freeze the change exists to remove).
+    "bounded-deadline": ("CommandLifecycle.cs", "bool exited=child.WaitForExit(deadlineMs);",
+                         "bool exited=child.WaitForExit(-1);",
+                         "a stop whose child never exits is killed at the deadline and returns after bounded cleanup"),
+    # Remove the generation gate: a command that completes after Home is delivered as fresh and would
+    # drive a late app launch or hide the dashboard after Home.
+    "stale-generation": ("CommandLifecycle.cs", "bool fresh=run.Gen==gen;", "bool fresh=true;",
+                         "stopA's completion after Home is delivered as stale (never fresh)"),
+    # Issue 1: remove Execute's whole-command catch. An exception from reader setup / WaitForExit then
+    # escapes Execute; only Begin's backstop catches it (worker_crash=, a different prefix), so the
+    # throwing-child claims (which require worker_error=) fail -- proving the inner catch is load-bearing.
+    "worker-exception": ("CommandLifecycle.cs",
+                         'catch(Exception e){try{child?.Kill();}catch{}return new ProcessResult(false,-1,false,false,false,"","worker_error="+e.Message,0);}',
+                         "",
+                         "an exception from stream/reader setup is caught and completes the run, never escaping the worker thread"),
+    # Issue 3: remove the hard reader-slot budget. Readers held by a pipe that Dispose cannot unblock then
+    # grow without limit and no command is ever rejected, so the no-unbounded-growth claim fails.
+    "reader-budget": ("CommandLifecycle.cs",
+                      'if(LiveReaders>MaxLiveReaders-2)return new ProcessResult(false,-1,false,false,false,"","rejected_reader_budget",0);',
+                      "",
+                      "live readers never exceed the hard cap even when Dispose cannot unblock them"),
+    # Issue 2: disable the launch-owner token check in TrySubmit. A stale timer can then submit on the new
+    # launch, so the Home->new-launch race claim (A's old timer cannot submit twice) fails.
+    "launch-owner": ("CommandLifecycle.cs",
+                     "internal bool TrySubmit(int token){if(!Owns(token)||submitted)return false;submitted=true;return true;}",
+                     "internal bool TrySubmit(int token){submitted=true;return true;}",
+                     "launch A cannot submit twice (no duplicate enqueue from a repeating timer)"),
+    # Issue 2, the OTHER named failure: drop the owner check in ConsumeHandoff. A stale timer can then
+    # consume the new launch's handoff and reset its submitted flag -- the "reset after handoff" bug.
+    "launch-owner-handoff": ("CommandLifecycle.cs",
+                             "internal bool ConsumeHandoff(int token){if(!Owns(token)||!handedOff)return false;",
+                             "internal bool ConsumeHandoff(int token){if(!handedOff)return false;",
+                             "A's old timer cannot consume B's handoff (no reset of the new launch after handoff)"),
+    # Ecore path: remove the argument safe-character check. Owner config is not shell-safe; an unsafe id
+    # would then be accepted (and, on TV, either corrupt argv or force /bin/sh). "a b" is the first refusal.
+    "ecore-arg-safety": ("CommandLifecycle.cs", "foreach(char c in a)if(!SafeChar(c))return false;", "",
+                         "an unsafe argument is refused: a b"),
+    # Ecore path: disable the deadline's kill request. A hung app_launcher child would then never be
+    # terminated at the deadline -- the freeze/leak this path exists to bound.
+    "ecore-deadline-kill": ("CommandLifecycle.cs",
+                            "internal bool Deadline(){if(completed||killRequested)return false;killRequested=true;timedOut=true;return true;}",
+                            "internal bool Deadline(){return false;}",
+                            "ecore: the deadline requests a kill"),
+    # Ecore path: weaken the kill-identity guard to always-true. A reused/disappeared/denied pid would then
+    # be signalled -- the exact harm the /proc start-time identity exists to prevent.
+    "ecore-kill-identity": ("CommandLifecycle.cs",
+                            "=>pid>0&&recordedStart>0&&currentStart>0&&recordedStart==currentStart;",
+                            "=>true;",
+                            "kill-identity: a disappeared process (current start unknown) must NOT be signalled"),
+    # Ecore path: drop the completed-guard in OnDel. A late DEL (after a kill) or a duplicate DEL would
+    # then re-complete the run and overwrite its result -- a double completion.
+    "ecore-late-del": ("CommandLifecycle.cs",
+                       "internal void OnDel(int exitCode,bool exited){if(completed)return;Finish(exited?exitCode:-1);}",
+                       "internal void OnDel(int exitCode,bool exited){Finish(exited?exitCode:-1);}",
+                       "ecore: a duplicate/late DEL (and a post-completion deadline) cannot re-complete or overwrite the run"),
+    "home-return-match": ("CommandLifecycle.cs", 'if(foreground==target){target="";return true;}',
+                          'if(foreground==target){target="";return false;}',
+                          "the exact late-surfacing cancelled app reclaims home once"),
 }
 
 
