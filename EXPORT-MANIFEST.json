@@ -718,8 +718,8 @@
     },
     {
       "path": "public-toolkit/docs/D2-CAPTURE.md",
-      "size": 12236,
-      "sha256": "e1feb2f1fd10c48574b35480bcfa84298b64f6ff6f3a72d044919bc844825fa1"
+      "size": 12542,
+      "sha256": "8b19fe932b705b799b2fcdfb7e72bfd298f3648667eb8f49b6d646faf1377799"
     },
     {
       "path": "public-toolkit/docs/D2-READBACK.md",
@@ -728,8 +728,8 @@
     },
     {
       "path": "public-toolkit/docs/RECOVERY2.md",
-      "size": 9176,
-      "sha256": "afbfc9cf70c3e8c01f434e79cd4fdceee5ff2db0b367c7bbdcd9e5601d7ed5d1"
+      "size": 11046,
+      "sha256": "2f2c291c20ed3619a3d5757b9ce633da8dfa90331f54e4bb07af3fde0f06582f"
     },
     {
       "path": "public-toolkit/examples/three-app-assemble-spec.example.json",
@@ -763,8 +763,8 @@
     },
     {
       "path": "public-toolkit/tvkit/assemble.py",
-      "size": 12555,
-      "sha256": "ad75815b1cecae7520bee25ab500cdba7b797b13c8bfbc93e0b15fba4bfe75db"
+      "size": 21526,
+      "sha256": "1d1c4049df015fad094c245feb030ea624354c0267c8a41e22b4e3d468920001"
     },
     {
       "path": "public-toolkit/tvkit/audit.py",
@@ -778,8 +778,8 @@
     },
     {
       "path": "public-toolkit/tvkit/capsule.py",
-      "size": 38632,
-      "sha256": "ca026c7399780d4f02cad9789b14989271a638e22b42a531399f8ae7b06b6373"
+      "size": 39279,
+      "sha256": "5b7f80f0f89e983b835cab82534d9373f8ab4b59e7cb2969b879ba9e51da527a"
     },
     {
       "path": "public-toolkit/tvkit/capture.py",
@@ -945,6 +945,11 @@
       "path": "tests/test_public_host_source.py",
       "size": 44860,
       "sha256": "2619a833ae5fa4cfd2a3780a36df22658babbbc9ef687061d2d904311fd883d4"
+    },
+    {
+      "path": "tests/test_public_toolkit_assemble_recovery2.py",
+      "size": 27983,
+      "sha256": "6c0aa5dd601b1d51951a00a0b7f3ffadbc3963872a474c1f5358f792e5b60149"
     },
     {
       "path": "tests/test_public_toolkit_assemble_stream.py",
