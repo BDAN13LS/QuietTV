@@ -15,7 +15,11 @@ their TV-computed digests. Temporary SDK staging was removed, and the existing
 boot, launcher and root process stayed unchanged. No restoration was performed;
 this evidence proves capture of that package, not a complete recovery system.
 External loader links still need explicitly reviewed restore policy; do not
-weaken capsule validation to admit them.
+weaken capsule validation to admit them. The offline recovery/2 assemble path
+(`assemble.assemble_recovery2`, docs/RECOVERY2.md) admits such a link only
+through a caller-supplied `ExternalRefPolicy` and exact target evidence, reusing
+the unchanged recovery/2 validator; this capture engine (`tvkit-capsule/1`) is
+unchanged and still refuses them.
 
 `tvkit/capture.py`. Plan phase D2 of
 `docs/superpowers/plans/2026-10-27-consumer-install.md`, offline capture slice.

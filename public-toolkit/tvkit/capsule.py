@@ -838,8 +838,17 @@ def validate(
         source.close()
 
 
-def entries_from_payload(handle: BinaryIO, install_root: str) -> list[dict[str, Any]]:
-    """Derive the capsule entry table from a captured payload tar (used by assemble)."""
+def entries_from_payload(handle: BinaryIO, install_root: str,
+                         external_links: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+    """Derive the capsule entry table from a captured payload tar (used by assemble).
+
+    ``external_links`` maps a link path to its exact approved external target
+    (recovery/2 only; built from a trusted policy). Such a link is kept instead
+    of refused. capsule/1 passes ``None``, so every escaping link is refused
+    exactly as before. The lexical check here is the same first layer the
+    manifest parser applies; the resolved-escape layer still runs in
+    :func:`_parse_entries` when the finished capsule is validated.
+    """
     result: list[dict[str, Any]] = []
     for archive, member, name in iter_payload_members(handle):
         item: dict[str, Any] = {
@@ -854,7 +863,8 @@ def entries_from_payload(handle: BinaryIO, install_root: str) -> list[dict[str, 
             assert stream is not None
             item["sha256"], item["size"] = _hash_stream(stream, member.size)
         if member.issym():
-            if _link_escapes(name, member.linkname, install_root):
+            if (not _is_approved_external(external_links, name, member.linkname)
+                    and _link_escapes(name, member.linkname, install_root)):
                 raise CapsuleError("payload contains a symbolic link that escapes the package root")
             item["linkTarget"] = member.linkname
         result.append(item)
