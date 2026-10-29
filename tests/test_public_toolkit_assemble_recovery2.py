@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tarfile
 import tempfile
+import tracemalloc
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -48,12 +50,28 @@ class Base(unittest.TestCase):
         self.members = {pid: members_for(pid) for pid in (EXT_PKG, PLAIN_PKG)}
         self.count = 0
 
-    def write_capture(self, directory):
-        """Stage the captured payload/xattr blobs and a recovery/2 assemble spec."""
+    def custom_policy(self, target):
+        """An ExternalRefPolicy approving one loader link pointing at ``target``."""
+        return r2.ExternalRefPolicy(self.profile.profile_id, (
+            r2.ExternalApproval(EXT_PKG, LINK, target, r2.TargetEvidence(**EVIDENCE)),))
+
+    def ext_members_linking(self, target):
+        """EXT_PKG's tree with its loader link pointing at ``target`` instead of TARGET."""
+        base = [m for m in members_for(EXT_PKG) if m["path"] != LINK]
+        return base + [{"path": LINK, "kind": "symlink", "uid": 5001, "gid": 100,
+                        "mode": 0o777, "linkTarget": target}]
+
+    def write_capture(self, directory, extra_for=None):
+        """Stage the captured payload/xattr blobs and a recovery/2 assemble spec.
+
+        ``extra_for`` maps a package id to extra raw tar members (TarInfo or
+        (TarInfo, bytes)), for building hostile payloads.
+        """
+        extra_for = extra_for or {}
         directory.mkdir()
         packages = []
         for pid, members in self.members.items():
-            (directory / f"{pid}.tar").write_bytes(fx.make_tar(members))
+            (directory / f"{pid}.tar").write_bytes(fx.make_tar(members, extra_for.get(pid, [])))
             (directory / f"{pid}.json").write_bytes(fx.xattr_manifest(pid, members))
             packages.append({"packageId": pid, "installRoot": f"/opt/usr/apps/{pid}",
                              "payload": f"{pid}.tar", "xattrManifest": f"{pid}.json"})
@@ -70,10 +88,10 @@ class Base(unittest.TestCase):
         (directory / "spec.json").write_text(json.dumps(spec), encoding="utf-8")
         return directory / "spec.json"
 
-    def spec_dir(self, name="src"):
+    def spec_dir(self, name="src", extra_for=None):
         self.count += 1
         d = self.tmp / f"{name}{self.count}"
-        return self.write_capture(d)
+        return self.write_capture(d, extra_for)
 
     def assemble(self, spec=None, out=None, facts="default", evidence="default", **pol):
         spec = spec if spec is not None else self.spec_dir()
@@ -199,8 +217,10 @@ class Refusals(Base):
         variants = {
             "wrong-build": {**self.facts, "firmwareBuild": "SYNTHETIC-BUILD-0000.2"},
             "wrong-region": {**self.facts, "region": "SYNTHETIC-OTHER"},
+            "wrong-model": {**self.facts, "model": "SYNTHETIC-QTV0002"},
             "no-build": {k: v for k, v in self.facts.items() if k != "firmwareBuild"},
             "no-region": {k: v for k, v in self.facts.items() if k != "region"},
+            "no-device-id": {k: v for k, v in self.facts.items() if k != "deviceId"},
         }
         for label, facts in variants.items():
             with self.subTest(label), self.no_source_read():
@@ -211,8 +231,8 @@ class Refusals(Base):
             self.refused("unknown", facts={**self.facts, "serial": "x"})
 
     def test_device_block_never_filled_from_profile(self):
-        # Negative control: with match_device off, a dropped region is caught building the device
-        # block (no default is substituted from the profile), never silently filled.
+        # Negative control: even with match_device off, a dropped region is caught by the explicit
+        # missing-fact check and refuses; no value is ever substituted from the expected profile.
         with mock.patch.object(asm, "match_device"):
             with self.assertRaises(CapsuleError):
                 self.assemble(out=self.tmp / "nofill",
@@ -264,6 +284,47 @@ class Refusals(Base):
         spec_file.write_text(json.dumps(data), encoding="utf-8")
         self.refused("does not approve", spec=spec_file)
 
+    def test_approved_but_ancestor_or_devtree_target_refused_before_mkdir(self):
+        # The exact-pair exemption keeps the link in the entry table; check_external_target in the
+        # real validator (before mkdir) is the only thing that stops a bad approved target.
+        for target, fragment in (("/opt/usr", "install root"), ("/dev/mem", "device tree")):
+            with self.subTest(target):
+                self.members[EXT_PKG] = self.ext_members_linking(target)
+                ev = {target: r2.TargetEvidence(**EVIDENCE)}
+                out = self.tmp / f"bad{fragment.split()[0]}"
+                with self.assertRaises(CapsuleError) as ctx:
+                    self.assemble(out=out, evidence=ev, external_policy=self.custom_policy(target))
+                self.assertIn(fragment, str(ctx.exception))
+                self.assertFalse(out.exists())
+
+    def test_guard_off_check_external_target_accepts_ancestor(self):
+        # Both ways: with check_external_target off, the /opt/usr ancestor target is accepted.
+        self.members[EXT_PKG] = self.ext_members_linking("/opt/usr")
+        ev = {"/opt/usr": r2.TargetEvidence(**EVIDENCE)}
+        pol = self.custom_policy("/opt/usr")
+        self.refused("install root", evidence=ev, external_policy=pol)
+        with mock.patch.object(r2, "check_external_target"):
+            self.assertIsInstance(
+                self.assemble(out=self.tmp / "ancestorok", evidence=ev, external_policy=pol), r2.Recovery2)
+
+    def test_payload_path_traversal_member_refused_before_mkdir(self):
+        spec = self.spec_dir(extra_for={EXT_PKG: [tarfile.TarInfo("../evil")]})
+        out = self.tmp / "trav-out"
+        with self.assertRaises(CapsuleError) as ctx:
+            self.assemble(spec=spec, out=out)
+        self.assertIn("outside the package root", str(ctx.exception))
+        self.assertFalse(out.exists())
+
+    def test_tar_member_below_the_loader_link_refused_before_mkdir(self):
+        info = tarfile.TarInfo(f"{LINK}/evil")
+        info.size = 1
+        spec = self.spec_dir(extra_for={EXT_PKG: [(info, b"x")]})
+        out = self.tmp / "below-out"
+        with self.assertRaises(CapsuleError) as ctx:
+            self.assemble(spec=spec, out=out)
+        self.assertIn("below a symbolic link", str(ctx.exception))
+        self.assertFalse(out.exists())
+
 
 class SourceConsistency(Base):
     def test_source_swapped_before_copy_is_refused(self):
@@ -286,6 +347,23 @@ class SourceConsistency(Base):
                 self.assemble(spec=spec, out=out)
         self.assertFalse((out / "capsule.json").exists())
 
+    def test_source_mutated_during_copy_is_refused(self):
+        spec = self.spec_dir()
+        out = self.tmp / "mutated"
+        first_payload = spec.parent / f"{EXT_PKG}.tar"
+        real_copy = asm._copy_chunks
+
+        def mutate_after_copy(handle, target, limit, label):
+            copied = real_copy(handle, target, limit, label)
+            with open(first_payload, "ab") as growing:
+                growing.write(b"grew after the descriptor was taken")
+            return copied
+
+        with mock.patch.object(asm, "_copy_chunks", mutate_after_copy):
+            with self.assertRaisesRegex(CapsuleError, "changed"):
+                self.assemble(spec=spec, out=out)
+        self.assertFalse((out / "capsule.json").exists())
+
     def test_destination_raced_in_during_copy_is_not_overwritten(self):
         spec = self.spec_dir()
         out = self.tmp / "raced"
@@ -303,6 +381,55 @@ class SourceConsistency(Base):
             with self.assertRaisesRegex(CapsuleError, "exclusively"):
                 self.assemble(spec=spec, out=out)
         self.assertFalse((out / "capsule.json").exists())
+
+
+class Streaming(Base):
+    def test_payload_inspection_and_copy_stream_below_one_payload(self):
+        # The recovery/2 path reuses the capsule/1 source-streaming machinery (_collect_packages
+        # and _write_capsule), so inspecting and copying two independent ~8 MiB payloads peaks
+        # below one payload. (The final recovery2.validate separately preallocates a manifest-read
+        # buffer of MAX_CAPSULE_MANIFEST_BYTES, which is unrelated to chunked archive copying, so
+        # the measurement here is scoped to the copy path.)
+        from tvkit import strictjson as sj
+        big = b"\xa5" * (8 * 1024 * 1024)
+        extra = [{"path": "res", "kind": "directory", "uid": 0, "gid": 0, "mode": 0o755},
+                 {"path": "res/big.bin", "kind": "file", "uid": 0, "gid": 0, "mode": 0o644, "data": big}]
+        self.members = {pid: members_for(pid, extra) for pid in (EXT_PKG, PLAIN_PKG)}
+        spec = self.spec_dir()  # stage the payload tars to disk BEFORE measuring
+        base = spec.parent
+        external_links_for = {}
+        for a in self.pol["external_policy"].approvals:
+            external_links_for.setdefault(a.package_id, {})[a.link_path] = a.target
+        out = self.tmp / "big"
+
+        tracemalloc.start()
+        try:
+            spec_obj = sj.require_object(
+                sj.load_file(spec, 4 * 1024 * 1024), "assemble spec",
+                ("schema", "packages", "registryChanges", "systemKeys", "bootChanges", "ourPackages"))
+            packages, sources = asm._collect_packages(spec_obj, base, external_links_for)
+            asm._write_capsule(out, sources, {"schema": "scratch", "packages": packages})
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+
+        print(f"PEAK-BYTES {peak}")
+        self.assertLess(peak, len(big), f"streaming copy peak was {peak} bytes")
+        # The derived entry carries the big file's real hash and size, and the copy is byte-exact.
+        entry = next(e for p in packages if p["packageId"] == EXT_PKG
+                     for e in p["entries"] if e["path"] == "res/big.bin")
+        self.assertEqual((entry["sha256"], entry["size"]), (fx.sha(big), len(big)))
+        self.assertEqual(fx.sha((out / "payload" / f"{EXT_PKG}.tar").read_bytes()),
+                         fx.sha((spec.parent / f"{EXT_PKG}.tar").read_bytes()))
+
+    def test_full_assemble_still_validates_with_big_payloads(self):
+        big = b"\xa5" * (8 * 1024 * 1024)
+        extra = [{"path": "res", "kind": "directory", "uid": 0, "gid": 0, "mode": 0o755},
+                 {"path": "res/big.bin", "kind": "file", "uid": 0, "gid": 0, "mode": 0o644, "data": big}]
+        self.members = {pid: members_for(pid, extra) for pid in (EXT_PKG, PLAIN_PKG)}
+        result = self.assemble(out=self.tmp / "bigok")
+        self.assertEqual(result.counts["packages"], 2)
+        self.assertEqual(result.counts["externalRefs"], 1)
 
 
 class GuardOff(Base):

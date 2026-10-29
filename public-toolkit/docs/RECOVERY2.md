@@ -173,8 +173,11 @@ unchanged.
   exactly the referenced targets — never copied from the policy. The in-memory
   manifest goes through the real validator (`recovery2.parse_manifest`) before
   any folder is created, and `recovery2.validate` runs again on the written
-  capsule; every refusal leaves the output untouched. capsule/1 `assemble` is
-  unchanged and still refuses a loader-link payload and a profile/2.
+  capsule. Every profile, policy, fact, spec and manifest refusal happens before
+  the output folder exists; a source that changes mid-copy or a raced
+  destination is refused without writing `capsule.json` or overwriting anything,
+  though a partial copy may remain in the new folder (as for capsule/1). capsule/1
+  `assemble` is unchanged and still refuses a loader-link payload and a profile/2.
   **No CLI command is wired for it; there is still no consumer, writer or TV restore.**
 - **No consumer of `UndoPlan`.** There is no typed writer, no transport
   capability, no CLI command, and no wiring into launcher or root-helper

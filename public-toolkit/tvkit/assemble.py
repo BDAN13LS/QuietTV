@@ -315,9 +315,14 @@ def assemble_recovery2(spec_path: str | Path, profile: Profile, device_facts: Ma
     change is accepted only for a field a :class:`BootFieldPolicy` approves. The
     device block binds every profile/2 fact (including firmwareBuild, region and
     the hashed device id) from the given facts; a missing or unknown fact refuses
-    and no value is ever taken from the expected profile. The finished manifest
-    goes through the real :mod:`recovery2` validator before any folder is
-    created and again on disk, so every refusal leaves the output untouched.
+    and no value is ever taken from the expected profile.
+
+    Every profile, policy, fact, spec and manifest refusal happens before the
+    output folder exists (the finished manifest goes through the real
+    :mod:`recovery2` validator before :func:`_write_capsule`). A source that
+    changes during the copy, or a destination file that races in, is refused
+    without writing ``capsule.json`` and without overwriting anything; a partial
+    copy may remain in the new folder, exactly as for capsule/1.
     """
     # Profile, policies and facts are checked before any source read or folder creation.
     r2.require_profile2(profile)
