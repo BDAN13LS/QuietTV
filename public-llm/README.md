@@ -1,5 +1,8 @@
 # quiettv-mcp
 
+For a copyable owner prompt and setup checklist, see
+[AI setup](../docs/AI-SETUP-PROMPT.md).
+
 A local [Model Context Protocol](https://modelcontextprotocol.io) server that lets an AI client (Claude Desktop,
 Claude Code, Codex, OpenCode) check and drive **one** owner-configured Quiet TV on your home network: read status,
 show Home, press remote keys, launch allowlisted apps, run redacted diagnostics, take a fresh screen capture it
