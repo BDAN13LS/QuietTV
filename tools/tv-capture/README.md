@@ -125,8 +125,9 @@ calls the supplied zero-argument exit-status provider after EOF. The transport
 must use bounded line reads (`readline(MAX_LINE + 1)`), an overall timeout, and
 pass only stdout (not SDK exit trailers). It must not return a success status
 before the reader actually exits. This module provides **no live/root transport**.
-The parent integration supplies xattr decoder handling independently; this
-reader only frames the manifest bytes.
+The typed `decode_xattr_stream` wrapper verifies xattr records with a 32 MiB
+ceiling and rejects package records; the package wrapper rejects xattr records.
+Both return opaque captured bytes. Manifest/capsule validation is a separate step.
 
 Close `CapturedStream.chunks` when abandoning a transfer. Normal exhaustion or
 close deletes its own spool; inode checks preserve an already replaced path.

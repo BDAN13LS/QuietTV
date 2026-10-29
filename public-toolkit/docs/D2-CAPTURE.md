@@ -1,10 +1,21 @@
 # D2 typed read-only capture engine
 
-An additional package-only reader is now in `tools/tv-capture`, with a strict
-PC-spooled decoder in `tvkit/package_stream.py`. See its README for protocol,
-limits and required caller transport controls. It is not a complete backend:
-full xattrs, observed firmware facts and the privileged channel remain missing.
-It registers no transport and enables no installer or cleanup action.
+The read-only producer in `tools/tv-capture` captures both package tar archives
+and version 1 full-xattr manifests. The typed `decode_package_stream` and
+`decode_xattr_stream` functions in `tvkit/package_stream.py` verify and spool
+those distinct record kinds outside Git on owner storage. See the reader README
+for protocol, limits and required caller transport controls. This is not a
+complete backend: observed firmware facts and a reviewed privileged channel
+remain missing. It registers no transport and enables no installer or cleanup.
+
+On the supported TV, a live read-only test captured an 81,920-byte archive and a
+3,971-byte metadata manifest: all 14 entries, file hashes and link targets
+matched, and 36 security attributes were observed. Both received files matched
+their TV-computed digests. Temporary SDK staging was removed, and the existing
+boot, launcher and root process stayed unchanged. No restoration was performed;
+this evidence proves capture of that package, not a complete recovery system.
+External loader links still need explicitly reviewed restore policy; do not
+weaken capsule validation to admit them.
 
 `tvkit/capture.py`. Plan phase D2 of
 `docs/superpowers/plans/2026-10-27-consumer-install.md`, offline capture slice.
@@ -47,7 +58,7 @@ an owner-storage capsule, and proves it.
 
 ## The injected adapter contract
 
-`CaptureBackend` is an abstract, **read-only** reader. This toolkit ships no
+`CaptureBackend` is an abstract, **read-only** reader. This toolkit ships no complete
 implementation and registers none; `transport.TRANSPORTS` stays empty. A real
 adapter is constructed and passed in by the owner's own reviewed code
 (a per-firmware, read-only channel). A fake backend is a test double only — it is
