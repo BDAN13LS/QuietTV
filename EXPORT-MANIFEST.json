@@ -758,8 +758,8 @@
     },
     {
       "path": "public-toolkit/tvkit/assemble.py",
-      "size": 5633,
-      "sha256": "f8fa0158903858aa856bb7a7f9f98369e29cd28e2e249cc13c9e46aef19ab426"
+      "size": 12555,
+      "sha256": "ad75815b1cecae7520bee25ab500cdba7b797b13c8bfbc93e0b15fba4bfe75db"
     },
     {
       "path": "public-toolkit/tvkit/audit.py",
@@ -773,8 +773,8 @@
     },
     {
       "path": "public-toolkit/tvkit/capsule.py",
-      "size": 37828,
-      "sha256": "531142e6d3af9539a02af3a2cdbea93aeb8bb3c54db84c0171bf35f66ecf3223"
+      "size": 38632,
+      "sha256": "ca026c7399780d4f02cad9789b14989271a638e22b42a531399f8ae7b06b6373"
     },
     {
       "path": "public-toolkit/tvkit/capture.py",
@@ -940,6 +940,11 @@
       "path": "tests/test_public_host_source.py",
       "size": 44860,
       "sha256": "2619a833ae5fa4cfd2a3780a36df22658babbbc9ef687061d2d904311fd883d4"
+    },
+    {
+      "path": "tests/test_public_toolkit_assemble_stream.py",
+      "size": 13313,
+      "sha256": "89551ae65058ecb640b37520fcf4124d7ed7079b293a30a05c8e11ab61c098bd"
     },
     {
       "path": "tests/test_public_toolkit_audit.py",
