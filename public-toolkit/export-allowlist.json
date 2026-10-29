@@ -79,7 +79,8 @@
     "tools/tv-capture/NuGet.Config",
     "tools/tv-capture/Program.cs",
     "tools/tv-capture/README.md",
-    "docs/AI-SETUP-PROMPT.md"
+    "docs/AI-SETUP-PROMPT.md",
+    "docs/ROADMAP.md"
   ],
   "includeIfPresent": [
     "README.md",

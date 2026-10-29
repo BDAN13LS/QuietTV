@@ -3,6 +3,19 @@
 This page is for an owner using a **local assistant that has access to their PC terminal and
 MCP client**. AI is optional; the same controls are available from the plain command line.
 
+## Assistants used on this project
+
+**Codex** has been used for QuietTV development, testing, technical setup and diagnostics
+on the reference TV. With local terminal/MCP access and the owner's permission, it can
+help prepare the PC, configure the controller and work through the available setup steps.
+
+**Claude Opus 4.8** has also been used successfully for selected development and code-review
+tasks. It can help with parts of this workflow; the complete installation path has not
+been verified with it, and some device/root requests can be refused.
+
+Neither assistant supplies an unpublished installer or recovery component. Use the
+checklist below to distinguish a supported action from a missing prerequisite.
+
 **Ordinary web chat without PC tooling cannot operate the TV.** It can explain the project,
 but it cannot run the local virtual environment, read the owner configuration, reach the
 home network or call the MCP server. Do not ask a chat-only assistant to perform setup.

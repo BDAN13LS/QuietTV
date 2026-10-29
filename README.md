@@ -56,9 +56,15 @@ screenshots, plus optional Wake-on-LAN followed by identity/status confirmation.
 
 ## AI setup prompt (optional)
 
-Use a local assistant with PC terminal or MCP access. A chat without those tools cannot
-operate your TV. Claude Opus 4.8 may help, but its complete setup path is unverified and
-it can refuse device/root work. Other models can refuse too. AI remains optional.
+Use a local assistant with PC terminal or MCP access. AI is optional.
+
+| Assistant | How it can help |
+|---|---|
+| **Codex** | Used to develop, test and troubleshoot QuietTV on the reference TV. It can guide technical setup, configure MCP, run available tools and help diagnose issues with your permission. |
+| **Claude Opus 4.8** | Also used successfully for selected development and code-review tasks. It can assist with parts of the workflow, although some device/root requests may be refused. |
+
+AI-assisted setup uses the published tools; it does not replace the unfinished consumer
+installer or recovery work. A chat without local PC tooling cannot operate your TV.
 
 Copy this into a local assistant that can use your PC terminal and MCP client. The
 expanded checklist is [docs/AI-SETUP-PROMPT.md](docs/AI-SETUP-PROMPT.md).
@@ -82,11 +88,22 @@ missing; continue safe PC preparation. Do not flash firmware or use raw reboots.
 Verify results with status/captures. Distinguish observed from untested outcomes.
 ```
 
-## Known limits
+## Project status
 
-- Store app-update transactions, DRM playback and physical HDMI video are **not established**.
-- IPTV picture is still black, and the cold-boot black gap is unresolved. Neither is claimed fixed.
-- One package capture is not an end-to-end restorable backup, root transport or self-installer.
+- [x] Reference-TV launcher, remote controls, native app launch, Settings and inputs.
+- [x] Reference-TV cleanup with owner backups stored off the TV.
+- [x] Package/security-metadata capture and verified PC readback on the reference TV.
+- [x] Local AI/MCP tools for status, controls, screenshots and optional wake.
+- [x] Streamed PC backup assembly with measured memory regression tests.
+- [ ] Automatic firmware verification and a public privileged connection.
+- [ ] Complete backup/restore and independent Rescue, verified on hardware.
+- [ ] Guided consumer installer and cleanup selection.
+- [ ] Verify Store app-update installation, DRM playback and physical HDMI video.
+- [ ] Resolve the IPTV black picture and remaining cold-boot visual issues.
+
+Upcoming work includes browser-assisted setup and additional widget/layout controls.
+See the [full roadmap](docs/ROADMAP.md). Checked items describe the reference TV or
+published components; they do not mean the complete consumer installer is finished.
 
 ## Development and evidence
 
