@@ -1641,14 +1641,63 @@ internal static class Dumper
     {
         RootInfo root = PathRules.ValidateRoot(rootArgument);
         string manifestFullPath = PathRules.ValidateManifestOutput(root, manifestArgument);
+        (byte[] bytes, int entries, int xattrs) = CollectManifest(root, store);
+        AtomicFile.Write(manifestFullPath, bytes, protectOnUnix: OperatingSystem.IsLinux());
+        return new DumpResult(entries, xattrs, bytes.Length);
+    }
+
+    internal static DumpResult DumpToStream(string rootArgument, Stream output, IXattrStore store)
+    {
+        if (output is null)
+        {
+            throw new BackupException("output stream is null");
+        }
+
+        if (!output.CanWrite)
+        {
+            throw new BackupException("output stream is not writable");
+        }
+
+        RootInfo root = PathRules.ValidateRoot(rootArgument);
+        (byte[] bytes, int entries, int xattrs) = CollectManifest(root, store);
+        output.Write(bytes, 0, bytes.Length);
+        return new DumpResult(entries, xattrs, bytes.Length);
+    }
+
+    private static (byte[] Bytes, int Entries, int Xattrs) CollectManifest(RootInfo root, IXattrStore store)
+    {
         List<TreeEntry> tree = TreeScanner.Scan(root.FullPath);
 
         List<ManifestEntry> entries = new List<ManifestEntry>(tree.Count);
         long xattrCount = 0;
+        long rawXattrBytes = 0;
         foreach (TreeEntry item in tree)
         {
             Dictionary<string, byte[]> attrs = store.Read(item.AbsolutePath, item.RelativePath);
             XattrLimits.Validate(attrs, item.RelativePath);
+
+            long entryRawBytes = 0;
+            foreach (KeyValuePair<string, byte[]> attr in attrs)
+            {
+                try
+                {
+                    long attrRawBytes = checked(
+                        (long)TextRules.StrictUtf8.GetByteCount(attr.Key) + attr.Value.LongLength);
+                    entryRawBytes = checked(entryRawBytes + attrRawBytes);
+                }
+                catch (OverflowException)
+                {
+                    throw new BackupException("raw extended-attribute bytes exceed the 32 MiB manifest limit");
+                }
+            }
+
+            if (entryRawBytes > Limits.MaxManifestBytes ||
+                rawXattrBytes > Limits.MaxManifestBytes - entryRawBytes)
+            {
+                throw new BackupException("raw extended-attribute bytes exceed the 32 MiB manifest limit");
+            }
+
+            rawXattrBytes += entryRawBytes;
             xattrCount += attrs.Count;
             entries.Add(new ManifestEntry
             {
@@ -1668,8 +1717,7 @@ internal static class Dumper
         };
 
         byte[] bytes = ManifestCodec.Serialize(manifest);
-        AtomicFile.Write(manifestFullPath, bytes, protectOnUnix: OperatingSystem.IsLinux());
-        return new DumpResult(entries.Count, (int)xattrCount, bytes.Length);
+        return (bytes, entries.Count, (int)xattrCount);
     }
 }
 
