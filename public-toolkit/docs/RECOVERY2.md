@@ -160,8 +160,31 @@ unchanged.
 
 - **No production profile/2, no real build or region values,** and no exact
   security-id override (`profiles/components/reviewed/`).
-- **No assemble path for recovery/2.** `assemble.py` is still capsule/1 only.
-  A recovery/2 capsule is currently written by hand or by tests.
+- **Assemble path (offline, PC only).** `assemble.assemble_recovery2(spec, profile,
+  device_facts, out, *, external_policy, boot_policy, target_evidence)` builds a
+  recovery/2 capsule from a capture, under its own spec schema
+  `tvkit-assemble-spec/2` (packages, registryChanges, systemKeys, bootChanges,
+  ourPackages; no `externalRefs`, `device` or policy key — the spec cannot
+  self-authorize). It binds every profile/2 fact from the given facts (build,
+  region and the hashed device id); a missing or unknown fact refuses and no
+  value is taken from the expected profile. An external loader link is kept only
+  when a payload symlink exactly matches an `ExternalRefPolicy` approval, and its
+  file evidence comes from the caller's `target_evidence`, which must cover
+  exactly the referenced targets — never copied from the policy. The in-memory
+  manifest goes through the real validator (`recovery2.parse_manifest`) before
+  any folder is created, and `recovery2.validate` runs again on the written
+  capsule. Every profile, policy, fact, spec and manifest refusal happens before
+  the output folder exists; a source that changes mid-copy or a raced destination
+  is refused without overwriting the raced-in file (each copy opens its target
+  exclusively) and before `capsule.json` is written. There is **no global
+  atomic-failure promise**, though: once the copy loop begins, a source-copy race
+  may leave a partially written folder (as for capsule/1), and the final on-disk
+  `recovery2.validate` runs only after `capsule.json` is written, so an xattr or
+  payload-byte failure there leaves a folder that contains `capsule.json` and is
+  invalid. A refusal means only that no validated capsule was produced and nothing
+  pre-existing was overwritten; the caller discards the output folder. capsule/1
+  `assemble` is unchanged and still refuses a loader-link payload and a profile/2.
+  **No CLI command is wired for it; there is still no consumer, writer or TV restore.**
 - **No consumer of `UndoPlan`.** There is no typed writer, no transport
   capability, no CLI command, and no wiring into launcher or root-helper
   removal ordering. The design order still holds: our changes first, then
