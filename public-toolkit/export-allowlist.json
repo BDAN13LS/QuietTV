@@ -78,7 +78,8 @@
     "tools/tv-capture/global.json",
     "tools/tv-capture/NuGet.Config",
     "tools/tv-capture/Program.cs",
-    "tools/tv-capture/README.md"
+    "tools/tv-capture/README.md",
+    "docs/AI-SETUP-PROMPT.md"
   ],
   "includeIfPresent": [
     "README.md",

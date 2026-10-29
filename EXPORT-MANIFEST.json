@@ -53,13 +53,18 @@
     },
     {
       "path": "README.md",
-      "size": 12546,
-      "sha256": "b4f489bb24da2b84e36e6db7749689c94af485dcba9b6ee592a33870781fdad8"
+      "size": 6044,
+      "sha256": "aaffd38f6b996b49dca9cdd27b3ea73623b9150257dd2329203b1d60740b8dec"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
       "size": 19718,
       "sha256": "59a846a1f90f9dfc596b436950e9e9bf6436901c8eca19bbb18d57d1016b699b"
+    },
+    {
+      "path": "docs/AI-SETUP-PROMPT.md",
+      "size": 4814,
+      "sha256": "35a0e1c0787f4555506c1ac22a6b6d3e537c5468e06efea82aed67da1940a268"
     },
     {
       "path": "docs/CLEANUP-STATUS.md",
@@ -453,8 +458,8 @@
     },
     {
       "path": "public-llm/README.md",
-      "size": 12976,
-      "sha256": "d0d1643f59aad4c77554a2f5836cd877f40572ad313f165bf9ec404415345c82"
+      "size": 13073,
+      "sha256": "ddab48b3d758dc034fb4883f66890b31c3a68b3d38240ac921de76c4e556f070"
     },
     {
       "path": "public-llm/SECURITY.md",
@@ -733,8 +738,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 6365,
-      "sha256": "a7fadd0e2a16d97da0170858890114071e46484394cd82e8a9b119ff1179c1dc"
+      "size": 6397,
+      "sha256": "6af75cd06e2f0db8640874407d0d7d22dd6dd8e2b39af517fbd326786d36a285"
     },
     {
       "path": "public-toolkit/frontend-export.json",
