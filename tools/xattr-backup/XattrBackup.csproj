@@ -13,4 +13,10 @@
     <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>QuietTVCapture</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>

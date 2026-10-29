@@ -35,6 +35,10 @@ dotnet XattrBackup.dll --self-test
 - Manifests are written with an atomic temporary file plus rename. On Linux the temporary file is restricted to mode 0600 immediately after creation and before any attribute bytes are written.
 - Standard output contains only counts (`entries`, `xattrs`, `set`, `removed`, `unchanged`, `manifest_bytes`). Attribute names and values are never printed.
 
+### Internal manifest stream sink
+
+`Dumper.DumpToStream(ROOT, Stream, IXattrStore)` is an internal API only. It adds no CLI command, raw remote endpoint, TV xattr producer, transport, or complete backup path. It writes the same validated version 1 manifest bytes as `--dump` to a caller-supplied stream, without creating a manifest or temporary file, without closing, disposing, or flushing the stream, and without making the sink write atomic. The caller must enforce Linux effective UID 0 plus `CAP_SYS_ADMIN` before invoking the real Linux store. `--dump` keeps its existing atomic file behavior (0600 temporary file, flush, rename).
+
 Exit codes: `0` success, `1` validation or operation failure, `2` usage, unsupported platform, or missing required privileges.
 
 ## Manifest format (version 1)
@@ -78,7 +82,8 @@ Manifest input is rejected if it contains unknown or duplicate JSON properties, 
 
 - At most 15,000 entries.
 - At most 1 MiB of attribute names plus values per entry.
-- At most 32 MiB per manifest.
+- At most 32 MiB of raw attribute names plus values across the manifest; collection stops before retaining an entry that would cross this raw bound.
+- Serialized manifests larger than 32 MiB are refused. The existing estimate and final checks remain. This API still buffers metadata and serialized JSON, including base64/DTO overhead; 32 MiB is not a total or peak RAM guarantee.
 - Unreadable files, directories, links, or attributes are errors; nothing is silently skipped.
 
 ## Restore semantics
@@ -118,6 +123,6 @@ A manifest can contain private attribute names and values. Keep it outside the r
 
 ## Self-test
 
-`--self-test` runs on Windows and uses only managed file APIs plus an in-memory attribute store, so it makes no native Linux calls. It covers hostile and duplicate paths, base64 and entry/manifest bounds, privilege-status parsing, binary JSON roundtrip, exact restore synchronization and write counts, count-preserving rename rejection with zero attribute writes, whole-preflight rejection on content, kind, link, membership, and root mismatches, root guards, atomic write cleanup, and the non-Linux CLI refusal.
+`--self-test` runs on Windows and uses only managed file APIs plus an in-memory attribute store, so it makes no native Linux calls. It covers hostile and duplicate paths, base64 and entry/manifest bounds, privilege-status parsing, binary JSON roundtrip, exact restore synchronization and write counts, count-preserving rename rejection with zero attribute writes, whole-preflight rejection on content, kind, link, membership, and root mismatches, root guards, atomic write cleanup, internal stream sink equality and guards, the raw xattr aggregate bound, and the non-Linux CLI refusal.
 
 The self-test does not test native xattr syscalls. Actual `--dump` and `--restore` behavior must be validated on Linux against the TV tree by the parent integration step.

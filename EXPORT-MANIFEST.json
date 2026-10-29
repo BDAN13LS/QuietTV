@@ -33,8 +33,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 5464,
-      "sha256": "f0803f861b16e852915b65ebd05f4e0433d00bcc577a69ea3738f1dbe4f0c056"
+      "size": 5607,
+      "sha256": "4aced6da04efc29d921f00cc543bf741dd5a582ccb0f67cfcdedee61fbba9418"
     },
     {
       "path": ".gitignore",
@@ -708,8 +708,8 @@
     },
     {
       "path": "public-toolkit/docs/D2-CAPTURE.md",
-      "size": 11478,
-      "sha256": "51dfc14a2710a2a24f36aacaad3c9e847f9066bed2383b498f31111819b70a97"
+      "size": 12236,
+      "sha256": "e1feb2f1fd10c48574b35480bcfa84298b64f6ff6f3a72d044919bc844825fa1"
     },
     {
       "path": "public-toolkit/docs/D2-READBACK.md",
@@ -813,8 +813,8 @@
     },
     {
       "path": "public-toolkit/tvkit/package_stream.py",
-      "size": 6431,
-      "sha256": "7ecc02daad31b7ed5432f2104a62c6efa84da0fd8f4ee3abdddfe903ab6999b1"
+      "size": 8808,
+      "sha256": "8310474bdf6be2ccbe08c9b270c0b3cbf8eed700d519848d432cb6c69b679a18"
     },
     {
       "path": "public-toolkit/tvkit/paths.py",
@@ -988,8 +988,8 @@
     },
     {
       "path": "tests/test_public_toolkit_package_stream.py",
-      "size": 6192,
-      "sha256": "23f2e4874351ece7b15449a828da1c9b510b9015d973d37920f78b2bc0b00b90"
+      "size": 8572,
+      "sha256": "bf04504ffd04c28d28ef7d74562086db072cadc5a9f360976166e3e4900a56e9"
     },
     {
       "path": "tests/test_public_toolkit_plan.py",
@@ -1063,18 +1063,18 @@
     },
     {
       "path": "tools/tv-capture/Program.cs",
-      "size": 10334,
-      "sha256": "86742b11d968074063e1bca9bbf3d34401d4f900647cdc4b2120c580ca6460ff"
+      "size": 19676,
+      "sha256": "e569faa4b758eda76166d873f115421e64443ae741947c8824e717a66f64e9cc"
     },
     {
       "path": "tools/tv-capture/QuietTVCapture.csproj",
-      "size": 587,
-      "sha256": "ba3186ac0b59c19b8d799431c052db89999039c4b981827d034948db78a63eda"
+      "size": 686,
+      "sha256": "e4ec209088c83d001caa17630af53812c2bd4b13d47a40f9e565507c4bf26532"
     },
     {
       "path": "tools/tv-capture/README.md",
-      "size": 4004,
-      "sha256": "e79c8538f25eb008587e4c0f20119828c0b6ca95e0cf6a825bd66b94f350a925"
+      "size": 8243,
+      "sha256": "9762fc4b4a3ead4259897e40e4428639948550167c0544d0e0d8bdcc339b9fc1"
     },
     {
       "path": "tools/tv-capture/global.json",
@@ -1128,23 +1128,23 @@
     },
     {
       "path": "tools/xattr-backup/Program.cs",
-      "size": 65835,
-      "sha256": "1de661daf1274182fb4819d1f0f09a4704991ee2a2ec234ac81e6b99e0a22f1b"
+      "size": 67670,
+      "sha256": "8c05c5d5105e3e04665bb5b8f5d44f5cf958d207f02e19088f4aa17785860ed8"
     },
     {
       "path": "tools/xattr-backup/README.md",
-      "size": 8986,
-      "sha256": "6601adc8bef3e4c7d82491588c8498bebfcbd24d8d347bf0086d04d44fed48bf"
+      "size": 10051,
+      "sha256": "29fcc930840766dc9af4f17a8a17d71c4a3f0eb94e56fa755791175e0edd4e9d"
     },
     {
       "path": "tools/xattr-backup/SelfTests.cs",
-      "size": 42695,
-      "sha256": "13c2ddb436bddeccc1f8580e5709c2af290820e44400cecfd887dcc75cde7e6b"
+      "size": 50677,
+      "sha256": "16d7860dd36407786318656c89e87f6d71bcbce66913e373726d5b9c66aabb94"
     },
     {
       "path": "tools/xattr-backup/XattrBackup.csproj",
-      "size": 514,
-      "sha256": "c24d6d7b9579cf4ae84c085aa3416e9010cb1e317fcc02a5513094d32c6ddf49"
+      "size": 717,
+      "sha256": "4d7d728450d8043bba0e5597a0a1a2a9e3e23e68da0b9caa22ef80f38e342883"
     }
   ],
   "excluded": [

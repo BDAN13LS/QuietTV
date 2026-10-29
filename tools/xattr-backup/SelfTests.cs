@@ -29,6 +29,10 @@ internal static class SelfTests
         Check("manifest-size-bound", TestManifestSizeBound);
         Check("linux-privilege-parser", TestPrivilegeParser);
         Check("dump-json-binary-roundtrip", TestDumpRoundtrip);
+        Check("dump-stream-matches-file", TestDumpToStreamMatchesFile);
+        Check("dump-stream-output-guards", TestDumpToStreamOutputGuards);
+        Check("dump-stream-write-failure", TestDumpToStreamWriteFailure);
+        Check("dump-raw-xattr-aggregate-bound", TestRawXattrAggregateBound);
         Check("restore-synchronizes-exactly", TestRestoreSynchronizes);
         Check("restore-removes-kernel-created-extra", TestRestoreRemovesKernelCreatedExtra);
         Check("restore-reapplies-kernel-overwritten-expected", TestRestoreReappliesKernelOverwrittenExpected);
@@ -299,6 +303,96 @@ internal static class SelfTests
         string[] temporary = Directory.GetFiles(fixture.BaseDir, ".manifest.json.tmp-*");
         Expect(temporary.Length == 0, "atomic manifest write left temporary files");
         Expect(new FileInfo(fixture.ManifestPath).Length > 0, "manifest is empty");
+    }
+
+    private static void TestDumpToStreamMatchesFile()
+    {
+        using Fixture fixture = new Fixture();
+        TryCreateFileLink(Path.Combine(fixture.Root, "link-file"), Path.Combine(fixture.Root, "binary.bin"));
+        TryCreateDirectoryLink(Path.Combine(fixture.Root, "link-dir"), fixture.OutsideDir);
+        FakeXattrStore store = SeedStore(fixture);
+        DumpResult fileResult = Dumper.Dump(fixture.Root, fixture.ManifestPath, store);
+        byte[] fileBytes = File.ReadAllBytes(fixture.ManifestPath);
+
+        int readsBefore = store.Reads;
+        string[] filesBefore = Directory.GetFiles(fixture.BaseDir, "*", SearchOption.AllDirectories);
+        using MemoryStream output = new MemoryStream();
+        DumpResult streamResult = Dumper.DumpToStream(fixture.Root, output, store);
+
+        Expect(output.CanWrite, "stream sink must remain writable");
+        byte[] streamBytes = output.ToArray();
+        Expect(streamBytes.AsSpan().SequenceEqual(fileBytes), "stream sink bytes must equal file dump bytes");
+        Expect(streamResult.Entries == fileResult.Entries, "stream entry count must match file dump");
+        Expect(streamResult.Xattrs == fileResult.Xattrs, "stream xattr count must match file dump");
+        Expect(streamResult.ManifestBytes == fileBytes.Length, "stream byte count must match file dump");
+        Expect(streamResult.ManifestBytes == streamBytes.Length, "stream result must report actual bytes written");
+        Expect(store.Reads > readsBefore, "stream sink must read the fake store");
+
+        output.WriteByte(0x5a);
+        Expect(output.Length == streamBytes.Length + 1L, "stream sink must stay open and writable");
+
+        string[] filesAfter = Directory.GetFiles(fixture.BaseDir, "*", SearchOption.AllDirectories);
+        Array.Sort(filesBefore, StringComparer.Ordinal);
+        Array.Sort(filesAfter, StringComparer.Ordinal);
+        Expect(filesBefore.SequenceEqual(filesAfter, StringComparer.Ordinal),
+            "stream sink must not create a manifest or temporary file");
+        Expect(Directory.GetFiles(fixture.BaseDir, ".manifest.json.tmp-*").Length == 0,
+            "stream sink left a temporary manifest file");
+    }
+
+    private static void TestDumpToStreamOutputGuards()
+    {
+        using Fixture fixture = new Fixture();
+        FakeXattrStore store = SeedStore(fixture);
+        int readsBefore = store.Reads;
+
+        ExpectThrows(() => Dumper.DumpToStream(fixture.Root, null!, store), "output stream");
+        Expect(store.Reads == readsBefore, "null output must be rejected before reading xattrs");
+
+        using MemoryStream readOnly = new MemoryStream(Array.Empty<byte>(), writable: false);
+        ExpectThrows(() => Dumper.DumpToStream(fixture.Root, readOnly, store), "not writable");
+        Expect(store.Reads == readsBefore, "read-only output must be rejected before reading xattrs");
+        Expect(!File.Exists(fixture.ManifestPath), "rejected stream sink must not create a manifest");
+        Expect(Directory.GetFiles(fixture.BaseDir, ".manifest.json.tmp-*").Length == 0,
+            "rejected stream sink left a temporary manifest file");
+    }
+
+    private static void TestDumpToStreamWriteFailure()
+    {
+        using Fixture fixture = new Fixture();
+        FakeXattrStore store = SeedStore(fixture);
+        using ThrowingWriteStream output = new ThrowingWriteStream();
+        ExpectThrows<IOException>(() => Dumper.DumpToStream(fixture.Root, output, store), "sink");
+        Expect(output.WriteAttempts == 1, "stream write failure must propagate without a success result");
+        Expect(!File.Exists(fixture.ManifestPath), "failed stream sink must not create a manifest");
+    }
+
+    private static void TestRawXattrAggregateBound()
+    {
+        using Fixture fixture = new Fixture();
+        const int fileCount = 40;
+        for (int i = 0; i < fileCount; i++)
+        {
+            File.WriteAllText(Path.Combine(fixture.Root, "raw" + i.ToString("D2") + ".txt"), "x");
+        }
+
+        const string name = "user.big";
+        byte[] repeated = new byte[Limits.MaxEntryXattrBytes - 64];
+        Array.Fill(repeated, (byte)0x5a);
+        long entryRawBytes = TextRules.StrictUtf8.GetByteCount(name) + repeated.LongLength;
+        Expect(entryRawBytes <= Limits.MaxEntryXattrBytes,
+            "raw aggregate fixture entry must stay within the 1 MiB per-entry limit");
+        XattrLimits.Validate(new Dictionary<string, byte[]> { [name] = repeated }, "raw aggregate fixture");
+        Expect(entryRawBytes * (fileCount + 1) > Limits.MaxManifestBytes,
+            "raw aggregate fixture must exceed the 32 MiB raw limit");
+
+        SharedValueXattrStore store = new SharedValueXattrStore(name, repeated);
+        using MemoryStream output = new MemoryStream();
+        ExpectThrows(() => Dumper.DumpToStream(fixture.Root, output, store), "raw extended-attribute bytes");
+        Expect(output.Length == 0, "raw aggregate guard must reject before writing manifest bytes");
+        Expect(store.Reads > 0, "raw aggregate fixture must read the fake store");
+        Expect(store.Reads < fileCount + 1,
+            "raw aggregate guard must stop before reading every entry; a disabled guard would read all entries");
     }
 
     private static void TestRestoreSynchronizes()
@@ -782,6 +876,31 @@ internal static class SelfTests
         throw new Exception("expected an error, but the operation succeeded");
     }
 
+    private static void ExpectThrows<T>(Action action, string? messageFragment) where T : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (T ex)
+        {
+            if (messageFragment is not null &&
+                ex.Message.IndexOf(messageFragment, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                throw new Exception(
+                    "expected error containing '" + messageFragment + "', got '" + ex.Message + "'");
+            }
+
+            return;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("expected " + typeof(T).Name + ", got " + ex.GetType().Name + ": " + ex.Message);
+        }
+
+        throw new Exception("expected an error, but the operation succeeded");
+    }
+
     private static bool StoreEquals(
         Dictionary<string, Dictionary<string, byte[]>> left,
         Dictionary<string, Dictionary<string, byte[]>> right)
@@ -872,10 +991,13 @@ internal static class SelfTests
 
         internal int Mutations { get; private set; }
 
+        internal int Reads { get; private set; }
+
         internal Func<string, string, byte[], Dictionary<string, byte[]>>? SideEffects { get; set; }
 
         public Dictionary<string, byte[]> Read(string absolutePath, string relativePath)
         {
+            Reads++;
             Dictionary<string, byte[]> copy = new Dictionary<string, byte[]>(StringComparer.Ordinal);
             if (_store.TryGetValue(absolutePath, out SortedDictionary<string, byte[]>? attrs))
             {
@@ -940,6 +1062,52 @@ internal static class SelfTests
             }
 
             return snapshot;
+        }
+    }
+
+    private sealed class SharedValueXattrStore : IXattrStore
+    {
+        private readonly string _name;
+        private readonly byte[] _value;
+
+        internal SharedValueXattrStore(string name, byte[] value)
+        {
+            _name = name;
+            _value = value;
+        }
+
+        internal int Reads { get; private set; }
+
+        public Dictionary<string, byte[]> Read(string absolutePath, string relativePath)
+        {
+            Reads++;
+            return new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            {
+                [_name] = _value,
+            };
+        }
+
+        public void Set(string absolutePath, string relativePath, string name, byte[] value) =>
+            throw new InvalidOperationException("shared-value store is read-only");
+
+        public void Remove(string absolutePath, string relativePath, string name) =>
+            throw new InvalidOperationException("shared-value store is read-only");
+    }
+
+    private sealed class ThrowingWriteStream : MemoryStream
+    {
+        internal int WriteAttempts { get; private set; }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            WriteAttempts++;
+            throw new IOException("test sink write failure");
+        }
+
+        public override void WriteByte(byte value)
+        {
+            WriteAttempts++;
+            throw new IOException("test sink write failure");
         }
     }
 }

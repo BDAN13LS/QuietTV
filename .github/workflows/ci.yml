@@ -101,6 +101,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet tools/tv-capture/bin/Release/net6.0/QuietTVCapture.dll --self-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet tools/xattr-backup/bin/Release/net6.0/XattrBackup.dll --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 
   public-source-guard:

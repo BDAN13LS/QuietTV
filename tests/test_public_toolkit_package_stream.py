@@ -10,12 +10,14 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "public-toolkit"))
-from tvkit.package_stream import decode_package_stream, StreamRefused, TAG, CHUNK
+from tvkit.capsule import MAX_XATTR_MANIFEST_BYTES
+from tvkit.package_stream import (
+    decode_package_stream, decode_xattr_stream, StreamRefused, TAG, CHUNK)
 
 
-def frames(data=b"package contents", package="fixture.app"):
+def frames(data=b"package contents", package="fixture.app", kind="package"):
     chunks = [data[n:n+CHUNK] for n in range(0, len(data), CHUNK)]
-    out = [TAG + b"BEGIN package " + package.encode() + b"\n"]
+    out = [TAG + b"BEGIN " + kind.encode() + b" " + package.encode() + b"\n"]
     for seq, chunk in enumerate(chunks):
         out.append(TAG + b"DATA " + str(seq).encode() + b" " + base64.b64encode(chunk)
                    + b" " + hashlib.sha256(chunk).hexdigest().encode() + b"\n")
@@ -46,6 +48,19 @@ class PackageStreamTests(unittest.TestCase):
     def assert_refused(self, rows, **kw):
         source = Closeable(rows)
         with self.assertRaises(StreamRefused): self.decode(source, **kw)
+        self.assertTrue(source.closed)
+        self.assertEqual(list(self.parent.iterdir()), [])
+
+    def decode_xattr(self, rows=None, **kw):
+        opts = dict(expected_package_id="fixture.app", max_bytes=MAX_XATTR_MANIFEST_BYTES,
+                    spool_parent=self.parent, exit_code=lambda: 0)
+        opts.update(kw)
+        if rows is None: rows = frames(b"\x00opaque xattr bytes\xff", kind="xattrs")
+        return decode_xattr_stream(rows, **opts)
+
+    def assert_xattr_refused(self, rows, **kw):
+        source = Closeable(rows)
+        with self.assertRaises(StreamRefused): self.decode_xattr(source, **kw)
         self.assertTrue(source.closed)
         self.assertEqual(list(self.parent.iterdir()), [])
 
@@ -127,6 +142,41 @@ class PackageStreamTests(unittest.TestCase):
             child = repo / "nested"; child.mkdir()
             with self.assertRaises(StreamRefused): self.decode(spool_parent=child)
             self.assertEqual(list(child.iterdir()), [])
+
+    def test_xattr_stream_is_opaque_and_matches_device_digest(self):
+        data = b"\x00opaque manifest bytes\xff" * 5000
+        result = self.decode_xattr(frames(data, kind="xattrs"))
+        self.assertEqual(result.device_sha256, hashlib.sha256(data).hexdigest())
+        self.assertEqual(result.device_size, len(data))
+        self.assertEqual(b"".join(result.chunks), data)
+        self.assertEqual(list(self.parent.iterdir()), [])
+
+    def test_xattr_early_close_removes_spool(self):
+        result = self.decode_xattr(frames(b"z" * (CHUNK + 3), kind="xattrs"))
+        self.assertEqual(len(next(result.chunks)), CHUNK)
+        result.chunks.close()
+        self.assertEqual(list(self.parent.iterdir()), [])
+
+    def test_kind_confusion_is_refused_both_ways(self):
+        self.assert_refused(frames(kind="xattrs"))
+        self.assert_xattr_refused(frames(kind="package"))
+
+    def test_xattr_limit_above_32MiB_refused_before_input(self):
+        consumed = []
+        def source():
+            consumed.append(True)
+            yield from frames(kind="xattrs")
+        with self.assertRaises(StreamRefused):
+            self.decode_xattr(source(), max_bytes=MAX_XATTR_MANIFEST_BYTES + 1)
+        self.assertEqual(consumed, [])
+        self.assertEqual(list(self.parent.iterdir()), [])
+
+    def test_xattr_32MiB_cap_with_small_payload_is_allowed(self):
+        data = b"tiny opaque payload"
+        result = self.decode_xattr(frames(data, kind="xattrs"),
+                                   max_bytes=MAX_XATTR_MANIFEST_BYTES)
+        self.assertEqual(b"".join(result.chunks), data)
+        self.assertEqual(list(self.parent.iterdir()), [])
 
     def test_protected_tokens_equal_profile(self):
         source = (ROOT/"tools/tv-capture/Program.cs").read_text(encoding="utf-8")
