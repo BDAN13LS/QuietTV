@@ -72,7 +72,13 @@
     "probe/ecore-runner/EcoreRunnerProbe.csproj",
     "probe/ecore-runner/Program.cs",
     "probe/ecore-runner/README.md",
-    "tests/test_ecore_probe_fd.py"
+    "tests/test_ecore_probe_fd.py",
+    "tools/tv-capture/.gitignore",
+    "tools/tv-capture/QuietTVCapture.csproj",
+    "tools/tv-capture/global.json",
+    "tools/tv-capture/NuGet.Config",
+    "tools/tv-capture/Program.cs",
+    "tools/tv-capture/README.md"
   ],
   "includeIfPresent": [
     "README.md",

@@ -33,8 +33,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 5022,
-      "sha256": "5dadfb899b8f2097cf6864658f95a0a3470a1bb65aaeda650b4d5bb546b26ed3"
+      "size": 5464,
+      "sha256": "f0803f861b16e852915b65ebd05f4e0433d00bcc577a69ea3738f1dbe4f0c056"
     },
     {
       "path": ".gitignore",
@@ -708,8 +708,8 @@
     },
     {
       "path": "public-toolkit/docs/D2-CAPTURE.md",
-      "size": 11094,
-      "sha256": "e94e3a00a4819816fe0443cc39832a458c044837e91d1181844a7a5057b82b72"
+      "size": 11478,
+      "sha256": "51dfc14a2710a2a24f36aacaad3c9e847f9066bed2383b498f31111819b70a97"
     },
     {
       "path": "public-toolkit/docs/D2-READBACK.md",
@@ -733,8 +733,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 6136,
-      "sha256": "4693f6d384b235a17d728b01639c1007e28eb4fb298de6e7a3fae9e5deb5f819"
+      "size": 6365,
+      "sha256": "a7fadd0e2a16d97da0170858890114071e46484394cd82e8a9b119ff1179c1dc"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -810,6 +810,11 @@
       "path": "public-toolkit/tvkit/journal.py",
       "size": 16945,
       "sha256": "1c048303543dd4a8f8ffd8fd6cad35c39ec9dcbde1a69bf62101a0a7f31cac7d"
+    },
+    {
+      "path": "public-toolkit/tvkit/package_stream.py",
+      "size": 6431,
+      "sha256": "7ecc02daad31b7ed5432f2104a62c6efa84da0fd8f4ee3abdddfe903ab6999b1"
     },
     {
       "path": "public-toolkit/tvkit/paths.py",
@@ -982,6 +987,11 @@
       "sha256": "b9ef9cc772dedf44a16adc92790890af5419a23977b622a01f7f938b65585d38"
     },
     {
+      "path": "tests/test_public_toolkit_package_stream.py",
+      "size": 6192,
+      "sha256": "23f2e4874351ece7b15449a828da1c9b510b9015d973d37920f78b2bc0b00b90"
+    },
+    {
       "path": "tests/test_public_toolkit_plan.py",
       "size": 14553,
       "sha256": "1402c23d196e89f5eac5e6f4d3975cae7836f33f314b677c7151f1b24ba5c7ae"
@@ -1040,6 +1050,36 @@
       "path": "tools/plan_optional_apps.py",
       "size": 9809,
       "sha256": "ed17002f24e97b7bd6ae6028efc20808c7259acfef6c63745e5cbe5c074a800b"
+    },
+    {
+      "path": "tools/tv-capture/.gitignore",
+      "size": 10,
+      "sha256": "6c5082c7e6de3e350189c67a1aacf757485ecc26e0a3cf96683528565f3e5f12"
+    },
+    {
+      "path": "tools/tv-capture/NuGet.Config",
+      "size": 74,
+      "sha256": "9508cae5f76364f56e80eb97cb16493977243cf38e5cca6284e3d74f83b20a2c"
+    },
+    {
+      "path": "tools/tv-capture/Program.cs",
+      "size": 10334,
+      "sha256": "86742b11d968074063e1bca9bbf3d34401d4f900647cdc4b2120c580ca6460ff"
+    },
+    {
+      "path": "tools/tv-capture/QuietTVCapture.csproj",
+      "size": 587,
+      "sha256": "ba3186ac0b59c19b8d799431c052db89999039c4b981827d034948db78a63eda"
+    },
+    {
+      "path": "tools/tv-capture/README.md",
+      "size": 4004,
+      "sha256": "e79c8538f25eb008587e4c0f20119828c0b6ca95e0cf6a825bd66b94f350a925"
+    },
+    {
+      "path": "tools/tv-capture/global.json",
+      "size": 78,
+      "sha256": "af6336f8bb598c240feafc0d77cb238310e78dda17b5a6dff3c11a9e232b665f"
     },
     {
       "path": "tools/tv-inspect/.gitignore",

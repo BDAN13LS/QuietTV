@@ -94,6 +94,14 @@ jobs:
           dotnet probe/ecore-runner/bin/ci/EcoreRunnerProbe.dll fd-selftest
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Build read-only package reader and run pure request guards
+        shell: pwsh
+        run: |
+          dotnet build tools/tv-capture/QuietTVCapture.csproj -c Release --configfile tools/tv-capture/NuGet.Config --nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet tools/tv-capture/bin/Release/net6.0/QuietTVCapture.dll --self-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 
   public-source-guard:
     name: Public source guard
