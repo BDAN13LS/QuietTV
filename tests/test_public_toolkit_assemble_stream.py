@@ -172,7 +172,7 @@ class AssembleCase(unittest.TestCase):
                 asm.assemble(spec, self.profile, fx.FACTS, out)
         self.assertFalse((out / "capsule.json").exists())
 
-    def test_previous_output_is_never_overwritten_after_source_mutation(self):
+    def test_existing_output_is_refused_before_source_inspection(self):
         members, payloads, xattrs = fx.build_parts()
         manifest = fx.capsule_manifest(payloads, xattrs, members)
         pids = fx.PACKAGE_IDS
@@ -181,11 +181,63 @@ class AssembleCase(unittest.TestCase):
         asm.assemble(spec, self.profile, fx.FACTS, out)
         before = tree_hashes(out)
 
-        with open(src / f"{pids[0]}.tar", "ab") as growing:
-            growing.write(b"changed after the capsule was made")
-        with self.assertRaises(CapsuleError):
-            asm.assemble(spec, self.profile, fx.FACTS, out)
+        with mock.patch.object(asm, "_inspect_payload", side_effect=AssertionError("source inspection started")):
+            with self.assertRaisesRegex(CapsuleError, "must not exist"):
+                asm.assemble(spec, self.profile, fx.FACTS, out)
         self.assertEqual(tree_hashes(out), before)
+
+    def test_destination_raced_in_during_copy_is_not_overwritten(self):
+        members, payloads, xattrs = fx.build_parts()
+        manifest = fx.capsule_manifest(payloads, xattrs, members)
+        src, spec = self.write_capture("captured", fx.PACKAGE_IDS, payloads, xattrs, manifest)
+        out = self.tmp / "raced"
+        real_copy = asm._copy_verified
+        raced = []
+        copies = 0
+
+        def race_then_copy(source, target, label):
+            nonlocal copies
+            copies += 1
+            if copies == 2:
+                target.write_bytes(b"existing owner file")
+                raced.append(target)
+            return real_copy(source, target, label)
+
+        with mock.patch.object(asm, "_copy_verified", race_then_copy):
+            with self.assertRaisesRegex(CapsuleError, "exclusively"):
+                asm.assemble(spec, self.profile, fx.FACTS, out)
+        self.assertEqual(len(raced), 1)
+        self.assertEqual(raced[0].read_bytes(), b"existing owner file")
+        self.assertTrue((out / "payload" / f"{fx.PACKAGE_IDS[0]}.tar").exists())
+        self.assertFalse((out / "capsule.json").exists())
+
+    def test_real_validator_bounds_both_metadata_read_paths(self):
+        members, payloads, xattrs = fx.build_parts()
+        manifest = fx.capsule_manifest(payloads, xattrs, members)
+        src, spec = self.write_capture("captured", fx.PACKAGE_IDS, payloads, xattrs, manifest)
+        out = self.tmp / "validated"
+        asm.assemble(spec, self.profile, fx.FACTS, out)
+        real_open = cap.DirectorySource.open
+        for target in ("capsule.json", f"xattrs/{fx.PACKAGE_IDS[0]}.json"):
+            with self.subTest(target=target):
+                sizes = []
+                class GuardedReader:
+                    def __init__(self, handle): self.handle = handle
+                    def read(self, size=-1):
+                        if not 0 < size <= 64 * 1024:
+                            raise AssertionError("validator metadata read is not bounded")
+                        sizes.append(size)
+                        return self.handle.read(size)
+                    def __enter__(self): return self
+                    def __exit__(self, *args): self.handle.close()
+                def guarded_open(source, name):
+                    handle = real_open(source, name)
+                    return GuardedReader(handle) if name == target else handle
+                with mock.patch.object(cap.DirectorySource, "open", guarded_open):
+                    result = cap.validate(out, self.profile, fx.FACTS)
+                self.assertTrue(sizes)
+                self.assertTrue(result.payload_verified)
+                self.assertTrue(result.device_verified)
 
     def test_oversize_payload_is_refused_before_reading(self):
         members, payloads, xattrs = fx.build_parts()
