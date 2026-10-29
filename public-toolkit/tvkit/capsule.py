@@ -639,11 +639,30 @@ def parse_xattr_manifest(data: Any) -> tuple[str, dict[str, dict[str, Any]]]:
     return root_basename, result
 
 
+def _read_capped(handle: BinaryIO, limit: int, label: str) -> bytes:
+    """Read small records without preallocating their maximum possible size.
+
+    The extra byte detects a growing/oversized source instead of trusting its
+    earlier size observation. Record bytes remain bounded; JSON objects and
+    decoding still have their own allocation overhead.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = handle.read(min(64 * 1024, limit - total + 1))
+        if not chunk:
+            return b"".join(chunks)
+        total += len(chunk)
+        if total > limit:
+            raise CapsuleError(f"{label} is too large")
+        chunks.append(chunk)
+
+
 def _cross_check_xattrs(package: Package, source: CapsuleSource) -> int:
     if source.size(package.xattr_manifest.file) > MAX_XATTR_MANIFEST_BYTES:
         raise CapsuleError("xattr manifest is too large")
     with source.open(package.xattr_manifest.file) as handle:
-        raw = handle.read(MAX_XATTR_MANIFEST_BYTES + 1)
+        raw = _read_capped(handle, MAX_XATTR_MANIFEST_BYTES, "xattr manifest")
     if len(raw) != package.xattr_manifest.size or hashlib.sha256(raw).hexdigest() != package.xattr_manifest.sha256:
         raise CapsuleError(f"{package.package_id}: xattr manifest bytes do not match the capsule hash")
     root_basename, xentries = _wrap("xattr manifest", lambda: parse_xattr_manifest(sj.loads(raw)))
@@ -783,7 +802,8 @@ def validate(
         if source.size(MANIFEST_NAME) > MAX_CAPSULE_MANIFEST_BYTES:
             raise CapsuleError("capsule.json is too large")
         with source.open(MANIFEST_NAME) as handle:
-            data = _wrap("capsule.json", sj.loads, handle.read())
+            data = _wrap("capsule.json", sj.loads,
+                         _read_capped(handle, MAX_CAPSULE_MANIFEST_BYTES, "capsule.json"))
         capsule = parse_manifest(data, profile)
         referenced = {MANIFEST_NAME}
         for package in capsule.packages:
