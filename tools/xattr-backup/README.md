@@ -83,7 +83,7 @@ Manifest input is rejected if it contains unknown or duplicate JSON properties, 
 - At most 15,000 entries.
 - At most 1 MiB of attribute names plus values per entry.
 - At most 32 MiB of raw attribute names plus values across the manifest; collection stops before retaining an entry that would cross this raw bound.
-- At most 32 MiB per serialized manifest. The serializer's estimate and final checks remain, so the in-memory serialized buffer stays bounded at 32 MiB.
+- Serialized manifests larger than 32 MiB are refused. The existing estimate and final checks remain. This API still buffers metadata and serialized JSON, including base64/DTO overhead; 32 MiB is not a total or peak RAM guarantee.
 - Unreadable files, directories, links, or attributes are errors; nothing is silently skipped.
 
 ## Restore semantics
