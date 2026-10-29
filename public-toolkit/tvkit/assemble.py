@@ -321,8 +321,17 @@ def assemble_recovery2(spec_path: str | Path, profile: Profile, device_facts: Ma
     output folder exists (the finished manifest goes through the real
     :mod:`recovery2` validator before :func:`_write_capsule`). A source that
     changes during the copy, or a destination file that races in, is refused
-    without writing ``capsule.json`` and without overwriting anything; a partial
-    copy may remain in the new folder, exactly as for capsule/1.
+    without overwriting the raced-in file (each copy opens its target
+    exclusively) and before ``capsule.json`` is written.
+
+    There is **no global atomic-failure promise**, however. Once
+    :func:`_write_capsule` begins, a source-copy race may leave a partially
+    written folder behind (as for capsule/1), and the final on-disk
+    :func:`recovery2.validate` runs only after ``capsule.json`` has been
+    written, so an xattr or payload-byte failure there leaves a folder that
+    contains ``capsule.json`` and is invalid. A refusal means only that no
+    validated capsule was produced and nothing pre-existing was overwritten,
+    not that the output folder was removed. The caller discards it.
     """
     # Profile, policies and facts are checked before any source read or folder creation.
     r2.require_profile2(profile)

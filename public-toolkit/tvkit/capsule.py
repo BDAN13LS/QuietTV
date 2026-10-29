@@ -763,7 +763,7 @@ def read_manifest_bytes(source: CapsuleSource) -> bytes:
     if source.size(MANIFEST_NAME) > MAX_CAPSULE_MANIFEST_BYTES:
         raise CapsuleError("capsule.json is too large")
     with source.open(MANIFEST_NAME) as handle:
-        return handle.read(MAX_CAPSULE_MANIFEST_BYTES + 1)
+        return _read_capped(handle, MAX_CAPSULE_MANIFEST_BYTES, "capsule.json")
 
 
 def manifest_schema(path: str | Path) -> str:

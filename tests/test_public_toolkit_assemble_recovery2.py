@@ -26,6 +26,7 @@ import test_public_toolkit_profile_v2 as pv2  # noqa: E402
 import test_public_toolkit_recovery2 as r2t  # noqa: E402
 from test_public_toolkit_recovery2 import BOOT, EVIDENCE, EXT_PKG, LINK, PLAIN_PKG, TARGET, members_for  # noqa: E402
 from tvkit import assemble as asm  # noqa: E402
+from tvkit import capsule as cap  # noqa: E402
 from tvkit import recovery2 as r2  # noqa: E402
 from tvkit.capsule import CapsuleError  # noqa: E402
 from tvkit.profile import device_id_sha256, parse_profile  # noqa: E402
@@ -369,27 +370,34 @@ class SourceConsistency(Base):
         out = self.tmp / "raced"
         real_copy = asm._copy_verified
         copies = 0
+        raced = {}
+        owner_bytes = b"existing owner file"
 
         def race_then_copy(source, target, label):
             nonlocal copies
             copies += 1
             if copies == 2:
-                target.write_bytes(b"existing owner file")
+                target.write_bytes(owner_bytes)
+                raced["path"] = target
             return real_copy(source, target, label)
 
         with mock.patch.object(asm, "_copy_verified", race_then_copy):
             with self.assertRaisesRegex(CapsuleError, "exclusively"):
                 self.assemble(spec=spec, out=out)
         self.assertFalse((out / "capsule.json").exists())
+        # The exclusive "xb" open must refuse before writing, so the raced-in owner file
+        # keeps its exact bytes — a refusal never clobbers a file that was already there.
+        self.assertEqual(raced["path"].read_bytes(), owner_bytes)
 
 
 class Streaming(Base):
     def test_payload_inspection_and_copy_stream_below_one_payload(self):
         # The recovery/2 path reuses the capsule/1 source-streaming machinery (_collect_packages
         # and _write_capsule), so inspecting and copying two independent ~8 MiB payloads peaks
-        # below one payload. (The final recovery2.validate separately preallocates a manifest-read
-        # buffer of MAX_CAPSULE_MANIFEST_BYTES, which is unrelated to chunked archive copying, so
-        # the measurement here is scoped to the copy path.)
+        # below one payload. This measures only the inspect/copy helpers; the end-to-end peak,
+        # including the final recovery2.validate (which now reads the manifest with _read_capped
+        # rather than preallocating MAX_CAPSULE_MANIFEST_BYTES), is covered by
+        # test_full_assemble_recovery2_peaks_below_one_payload.
         from tvkit import strictjson as sj
         big = b"\xa5" * (8 * 1024 * 1024)
         extra = [{"path": "res", "kind": "directory", "uid": 0, "gid": 0, "mode": 0o755},
@@ -431,6 +439,33 @@ class Streaming(Base):
         self.assertEqual(result.counts["packages"], 2)
         self.assertEqual(result.counts["externalRefs"], 1)
 
+    def test_full_assemble_recovery2_peaks_below_one_payload(self):
+        # End-to-end memory regression: the WHOLE assemble_recovery2, including the final on-disk
+        # recovery2.validate (which reads capsule.json and re-hashes both payloads and xattr
+        # manifests), must peak below a single ~8 MiB payload. The old shared read_manifest_bytes
+        # did handle.read(MAX_CAPSULE_MANIFEST_BYTES + 1), preallocating a 16 MiB buffer inside
+        # validate even for a tiny manifest, which pushes this peak past the threshold; the
+        # _read_capped reader does not. The threshold is one payload and the validator is NOT
+        # skipped: both are the point of the regression. Normal assembly peaks near ~3.2 MB.
+        big = b"\xa5" * (8 * 1024 * 1024)
+        extra = [{"path": "res", "kind": "directory", "uid": 0, "gid": 0, "mode": 0o755},
+                 {"path": "res/big.bin", "kind": "file", "uid": 0, "gid": 0, "mode": 0o644, "data": big}]
+        self.members = {pid: members_for(pid, extra) for pid in (EXT_PKG, PLAIN_PKG)}
+        spec = self.spec_dir()  # stage both ~8 MiB payload tars to disk BEFORE measuring
+        out = self.tmp / "fullbig"
+
+        tracemalloc.start()
+        try:
+            result = self.assemble(spec=spec, out=out)
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+
+        print(f"FULL-PEAK-BYTES {peak}")
+        self.assertEqual(result.counts["packages"], 2)
+        self.assertEqual(result.counts["externalRefs"], 1)
+        self.assertLess(peak, len(big), f"full assemble peak was {peak} bytes")
+
 
 class GuardOff(Base):
     def test_empty_policy_refuses_the_loader_link(self):
@@ -447,6 +482,75 @@ class GuardOff(Base):
         with mock.patch.object(r2, "check_external_ref"):
             self.assertIsInstance(
                 self.assemble(out=self.tmp / "staleok", evidence=stale), r2.Recovery2)
+
+
+class _RecordingHandle:
+    """Wraps a real capsule.json file handle and records every read() size requested.
+
+    It records the *requested* size, not the bytes returned: a tiny manifest read
+    with handle.read(16 MiB + 1) returns only a few hundred bytes yet preallocates a
+    16 MiB buffer, so only the requested size exposes the old over-allocation.
+    """
+
+    def __init__(self, handle, sizes):
+        self._handle = handle
+        self._sizes = sizes
+
+    def read(self, size=-1, *args, **kwargs):
+        self._sizes.append(size)
+        return self._handle.read(size, *args, **kwargs)
+
+    def __enter__(self):
+        self._handle.__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        return self._handle.__exit__(*exc)
+
+    def __getattr__(self, name):
+        return getattr(self._handle, name)
+
+
+class ManifestBoundedRead(Base):
+    """The shared capsule.json reader must read in bounded chunks, not preallocate 16 MiB.
+
+    Spies DirectorySource.open (no production monkeypatch) and asserts every requested
+    read of capsule.json is >0 and <=64 KiB. With the old read_manifest_bytes that did
+    handle.read(MAX_CAPSULE_MANIFEST_BYTES + 1) this FAILS (a 16 MiB+1 request); with the
+    _read_capped reader it PASSES. The both-ways control reverts the production function.
+    """
+
+    def _spy_capsule_json_reads(self, sizes):
+        real_open = cap.DirectorySource.open
+
+        def spy_open(src_self, name):
+            handle = real_open(src_self, name)
+            if name != cap.MANIFEST_NAME:
+                return handle
+            return _RecordingHandle(handle, sizes)
+
+        return mock.patch.object(cap.DirectorySource, "open", spy_open)
+
+    def _assemble_folder(self):
+        out = self.tmp / "forread"
+        self.assemble(out=out)
+        return out
+
+    def test_validate_and_validate_any_and_manifest_schema_read_in_bounded_chunks(self):
+        out = self._assemble_folder()
+        sizes: list[int] = []
+        with self._spy_capsule_json_reads(sizes):
+            # All three shared callsites of read_manifest_bytes.
+            self.assertEqual(cap.manifest_schema(out), r2.RECOVERY_SCHEMA)
+            self.assertIsInstance(
+                r2.validate(out, self.profile, self.facts, **self.pol), r2.Recovery2)
+            self.assertIsInstance(
+                r2.validate_any(out, self.profile, self.facts, **self.pol), r2.Recovery2)
+        self.assertTrue(sizes, "capsule.json was never read through the shared reader")
+        for requested in sizes:
+            self.assertGreater(requested, 0, f"a capsule.json read requested {requested} bytes")
+            self.assertLessEqual(requested, 64 * 1024,
+                                 f"a capsule.json read requested {requested} bytes (>64 KiB)")
 
 
 if __name__ == "__main__":
