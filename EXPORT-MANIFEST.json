@@ -53,8 +53,8 @@
     },
     {
       "path": "README.md",
-      "size": 6044,
-      "sha256": "aaffd38f6b996b49dca9cdd27b3ea73623b9150257dd2329203b1d60740b8dec"
+      "size": 7173,
+      "sha256": "fbb948af12490663a7d3361f268f55e80d30dccb45635a54f41304100cc6cd95"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
@@ -63,8 +63,8 @@
     },
     {
       "path": "docs/AI-SETUP-PROMPT.md",
-      "size": 4814,
-      "sha256": "35a0e1c0787f4555506c1ac22a6b6d3e537c5468e06efea82aed67da1940a268"
+      "size": 5531,
+      "sha256": "09c26c75788791a8840274d8d9507fce56a89ca1bb0cd54ed8bb609b3c5d5097"
     },
     {
       "path": "docs/CLEANUP-STATUS.md",
@@ -80,6 +80,11 @@
       "path": "docs/INSTALL-OPTIONS.md",
       "size": 4735,
       "sha256": "b5de37fe430706f33f993d259f0e0c5a3c7dddd08e3e3cdec7db83077e2bc7c7"
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "size": 2769,
+      "sha256": "52a683caf4b3dbcc9ef9f63c02c43f682b6bc388c749dd9b2d94a92365defd03"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -738,8 +743,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 6397,
-      "sha256": "6af75cd06e2f0db8640874407d0d7d22dd6dd8e2b39af517fbd326786d36a285"
+      "size": 6421,
+      "sha256": "aab51c3ea4b95d04c65c92bc8238b960ab08f3ccf5dd61985282e45e8cea1690"
     },
     {
       "path": "public-toolkit/frontend-export.json",
