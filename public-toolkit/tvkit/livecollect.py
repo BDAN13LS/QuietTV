@@ -322,6 +322,9 @@ def _validate_config_xml(raw: bytes, package_id: str) -> None:
         _fail("the signed widget's config.xml is not well-formed XML")
     if root.tag != _ZIP_WIDGET_TAG:
         _fail("the signed widget's config.xml is not a Tizen widget document")
+    contents = root.findall("{" + _WIDGET_NS + "}content")
+    if len(contents) != 1 or contents[0].get("src") != "index.html":
+        _fail("the signed widget entry point is not the reviewed local probe; refusing")
     apps = root.findall(_ZIP_APP_TAG)
     if len(apps) != 1:
         _fail("the signed widget's config.xml must declare exactly one tizen:application")
@@ -647,7 +650,7 @@ def _collection_doc(run_id: str, meta: dict | None, cleanup_status: str,
         "collectionId": run_id,
         "cleanup": {"status": cleanup_status},
         "note": ("Live collection over an owner-injected trusted adapter. This record "
-                 "claims two fresh same-session artifacts and a join only; it makes no "
+                 "records an attempt and its cleanup; joined artifacts are listed only after validation. It makes no "
                  "boot, root or launcher claim and enables no action."),
     }
     if owned is not None:

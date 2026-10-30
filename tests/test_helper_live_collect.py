@@ -325,6 +325,11 @@ class LiveCase(unittest.TestCase):
 # ---------------------------------------------------------------- positive path
 
 class SuccessfulCollectionTests(LiveCase):
+    def test_collector_caps_fit_helper_saved_sources(self):
+        limits = dict(hs.PREFLIGHT_SOURCES)
+        self.assertLessEqual(liveops.MAX_REPORT_BYTES, limits["productInfoReport"])
+        self.assertLessEqual(liveops.MAX_NATIVE_FRAME_BYTES, limits["nativeInspectionFrame"])
+
     def test_two_artifacts_receipt_and_seven_facts_with_real_helper_preflight(self):
         summary = lc.collect_reports(**self.kwargs())
         self.assertEqual(summary["status"], "collected")
@@ -635,6 +640,16 @@ class ObservationRefusalTests(LiveCase):
 
 
 class WidgetValidationTests(LiveCase):
+    def test_remote_entrypoint_is_not_the_reviewed_probe(self):
+        config = pack.assemble(APP_ID, PACKAGE, "0.1.0")["config.xml"]
+        changed = config.replace(b'src="index.html"', b'src="https://media.example/other.html"')
+        self.assertNotEqual(config, changed)
+        self.wgt_bytes = make_wgt(extra={"config.xml": changed})
+        self.wgt_path.write_bytes(self.wgt_bytes)
+        with self.assertRaises(lc.LiveCollectionError):
+            lc.collect_reports(**self.kwargs())
+        self.assertEqual(self.ops.session_calls, [])
+
     def test_package_mismatch_refused_before_any_tv_operation(self):
         other = make_wgt(package="Z9Y8X7W6V5")
         wgt = self.owner / "other.wgt"

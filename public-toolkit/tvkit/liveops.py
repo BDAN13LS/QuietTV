@@ -48,7 +48,7 @@ from typing import Callable
 
 MAX_REPORT_BYTES = 256 * 1024          # factsjoin refuses a report larger than this
 MAX_REPORT_READ_BYTES = MAX_REPORT_BYTES + 1  # adapter reads at most cap+1 to report oversize
-MAX_NATIVE_FRAME_BYTES = 9 * 1024 * 1024      # one framed stdout capture, bounded
+MAX_NATIVE_FRAME_BYTES = 4 * 1024 * 1024      # one framed stdout capture, bounded
 MAX_UPLOAD_BYTES = 16 * 1024 * 1024           # one pushed artifact, bounded
 
 # Fixed data-path templates. Only the validated 10-character package id is
