@@ -540,7 +540,7 @@ class ProviderFailureContainmentTests(LiveCase):
         self.assertEqual(status["primaryFailure"]["category"], "refused")
         namespace = status["namespace"]
         self.assertEqual(namespace["packageId"], PACKAGE)
-        self.assertRegex(namespace["remoteRunDir"], r"/tmp/quiettv-collect-[0-9a-f]{32}$")
+        self.assertRegex(namespace["remoteRunDir"], r"/home/owner/share/tmp/sdk_tools/quiettv-collect-[0-9a-f]{32}$")
         self.assertEqual(namespace["absenceConfirmed"], True)
         self.assertEqual(namespace["installAttempted"], True)
         self.assertEqual([u["sha256"] for u in namespace["uploads"]], [sha(self.wgt_bytes)])

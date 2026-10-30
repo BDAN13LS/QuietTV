@@ -57,7 +57,8 @@ DATA_PATH_TEMPLATES = (
     "/opt/usr/home/owner/apps_rw/{package}/data/device-facts.json",
     "/opt/usr/apps/{package}/data/device-facts.json",
 )
-REMOTE_TMP_ROOT = "/tmp"
+# The reference Samsung SDK refuses pushes to /tmp; this is its tested staging root.
+REMOTE_TMP_ROOT = "/home/owner/share/tmp/sdk_tools"
 _RUN_ID_RE = re.compile(r"[0-9a-f]{32}\Z")
 
 

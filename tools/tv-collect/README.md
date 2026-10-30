@@ -160,3 +160,9 @@ explicit instance to `tvkit.livecollect.collect_reports(..., ops=...)`).
   the parent's own live channel can verify that.
 - A stock-TV consumer setup still needs a published, reviewed, typed adapter
   and an authenticated-root read path. Both are future work, not assumed here.
+
+On the reference TV the Samsung SDK rejects pushes to `/tmp`. Run directories therefore
+use `/home/owner/share/tmp/sdk_tools/quiettv-collect-<run-id>`. The trusted adapter must
+create an accessible directory only inside that fresh namespace, verify uploaded hashes,
+and remove the directory after cleanup. A transfer/readback/removal probe passed there;
+this does not establish compatibility on another model or firmware.
