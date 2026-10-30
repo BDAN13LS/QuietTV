@@ -16,6 +16,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import traceback
 import unittest
 import zipfile
 from pathlib import Path
@@ -110,6 +111,13 @@ def write_native(root):
 
 # ---------------------------------------------------------------- fake adapter
 
+class _MalformedCleanupField:
+    """A hostile field value whose repr carries a secret."""
+
+    def __repr__(self):
+        return f"<{SECRET_MARKER}>"
+
+
 class FakeOps(liveops.LiveOps):
     name = "fake"
     implemented = True
@@ -124,20 +132,28 @@ class FakeOps(liveops.LiveOps):
         self.closed = 0
         self.pushed_sha = None
         self.fail_on = session_options.pop("fail_on", None)
+        self.fail_exc = session_options.pop("fail_exc", None)
         self.reconcile_unknown = session_options.pop("reconcile_unknown", False)
         self.report = session_options.pop("report", None)
         self.frame = session_options.pop("frame", None)
+        self.session_error = session_options.pop("session_error", None)
         self.extra_options = session_options
 
     def session(self, run_id):
         self.session_calls.append(run_id)
+        if self.session_error is not None:
+            raise self.session_error
         self.session_obj = FakeSession(self, run_id, **self.extra_options)
         return self.session_obj
 
 
 class FakeSession(liveops.LiveSession):
     def __init__(self, provider, run_id, *, token="session-A", binding=None,
-                 absent=True, exit_code=0, native_token=None, native_binding=None):
+                 absent=True, exit_code=0, native_token=None, native_binding=None,
+                 absence_token=None, absence_binding=None, fail_on=None, fail_exc=None,
+                 drift_after=None, reconcile_absent_after=False,
+                 reconcile_remove_unowned=False, malformed_cleanup=False,
+                 cleanup_error=None, close_error=None):
         self.provider = provider
         self.run_id = run_id
         self._token = token
@@ -146,6 +162,17 @@ class FakeSession(liveops.LiveSession):
         self.exit_code = exit_code
         self.native_token = native_token
         self.native_binding = native_binding
+        self.absence_token = absence_token
+        self.absence_binding = absence_binding
+        self.fail_on = provider.fail_on if fail_on is None else fail_on
+        self.fail_exc = provider.fail_exc if fail_exc is None else fail_exc
+        self.drift_after = drift_after
+        self.reconcile_unknown = provider.reconcile_unknown
+        self.reconcile_absent_after = reconcile_absent_after
+        self.reconcile_remove_unowned = reconcile_remove_unowned
+        self.malformed_cleanup = malformed_cleanup
+        self.cleanup_error = cleanup_error
+        self.close_error = close_error
 
     @property
     def session_token(self):
@@ -159,58 +186,104 @@ class FakeSession(liveops.LiveSession):
         return cls(ok=True, run_id=self.run_id, session_token=self._token,
                    binding=self._binding, **fields)
 
+    def _maybe_fail(self, op):
+        if self.fail_on == op:
+            raise self.fail_exc if self.fail_exc is not None else liveops.LiveOpsError(SECRET_MARKER)
+
+    def _maybe_drift(self, op):
+        if self.drift_after == op:
+            self._token = "session-changed"
+            self._binding = object()
+
     def assert_absent(self, package_id, data_paths):
         self.provider.calls.append(("assert_absent", package_id, data_paths))
-        if self.provider.fail_on == "assert_absent":
-            raise liveops.LiveOpsError(SECRET_MARKER)
-        return self._result(liveops.AbsenceResult, package_absent=self.absent, data_absent=self.absent)
+        self._maybe_fail("assert_absent")
+        result = liveops.AbsenceResult(
+            ok=True, run_id=self.run_id,
+            session_token=self.absence_token if self.absence_token is not None else self._token,
+            binding=self.absence_binding if self.absence_binding is not None else self._binding,
+            package_absent=self.absent, data_absent=self.absent)
+        self._maybe_drift("assert_absent")
+        return result
 
     def install_widget(self, package_id, wgt, wgt_sha, remote_tmp_wgt):
         self.provider.calls.append(("install_widget", package_id, wgt, wgt_sha, remote_tmp_wgt))
         self.provider.pushed_sha = wgt_sha
-        if self.provider.fail_on == "install":
-            raise liveops.LiveOpsError(SECRET_MARKER)
-        return self._result(liveops.InstallResult, pushed=True, install_attempted=True, installed=True)
+        self._maybe_fail("install")
+        result = self._result(liveops.InstallResult, pushed=True, install_attempted=True, installed=True)
+        self._maybe_drift("install")
+        return result
 
     def launch_facts(self, package_id):
         self.provider.calls.append(("launch_facts", package_id))
-        return self._result(liveops.LaunchResult, launched=True)
+        self._maybe_fail("launch_facts")
+        result = self._result(liveops.LaunchResult, launched=True)
+        self._maybe_drift("launch_facts")
+        return result
 
     def read_report(self, package_id, data_paths):
         self.provider.calls.append(("read_report", package_id, data_paths))
+        self._maybe_fail("read_report")
         body = self.provider.report if self.provider.report is not None else report_bytes()
-        return self._result(liveops.ReportResult, data=body)
+        result = self._result(liveops.ReportResult, data=body)
+        self._maybe_drift("read_report")
+        return result
 
     def push_native(self, artifacts, remote_tmp_dir):
         self.provider.calls.append(("push_native", artifacts, remote_tmp_dir))
-        return self._result(liveops.OpResult)
+        self._maybe_fail("push_native")
+        result = self._result(liveops.OpResult)
+        self._maybe_drift("push_native")
+        return result
 
     def run_native(self, remote_dll):
         self.provider.calls.append(("run_native", remote_dll))
+        self._maybe_fail("run_native")
         stdout = self.provider.frame if self.provider.frame is not None else _encode(native_doc())
-        return liveops.NativeResult(
+        result = liveops.NativeResult(
             ok=True, run_id=self.run_id,
             session_token=self.native_token if self.native_token is not None else self._token,
             binding=self.native_binding if self.native_binding is not None else self._binding,
             exit_code=self.exit_code, stdout=stdout)
+        self._maybe_drift("run_native")
+        return result
 
     def close_owned_run(self, owned):
         self.provider.cleaned.append(owned)
-        if self.provider.reconcile_unknown:
+        if self.cleanup_error is not None:
+            raise self.cleanup_error
+        if self.malformed_cleanup:
+            return liveops.CleanupReport(
+                package_removed=False, package_absent_after=False,
+                removed_uploads=_MalformedCleanupField(), unconfirmed_uploads=(),
+                recovery_needed=False)
+        uploads = tuple(u.remote_path for u in owned.uploads)
+        if self.reconcile_unknown:
             return liveops.CleanupReport(
                 package_removed=False, package_absent_after=False, removed_uploads=(),
-                unconfirmed_uploads=tuple(u.remote_path for u in owned.uploads),
-                recovery_needed=True)
+                unconfirmed_uploads=uploads, recovery_needed=True)
+        if self.reconcile_remove_unowned:
+            # A provider that "fixes" a namespace it never proved it owned.
+            self.provider.uninstalled.append(owned.package_id)
+            return liveops.CleanupReport(
+                package_removed=True, package_absent_after=True, removed_uploads=uploads,
+                unconfirmed_uploads=(), recovery_needed=False)
+        if self.reconcile_absent_after:
+            # A partial/failed install that left nothing: absence verified, no uninstall.
+            return liveops.CleanupReport(
+                package_removed=False, package_absent_after=True, removed_uploads=uploads,
+                unconfirmed_uploads=(), recovery_needed=False)
         owned_package = owned.absence_confirmed and owned.install_attempted
         if owned_package:
             self.provider.uninstalled.append(owned.package_id)
         return liveops.CleanupReport(
             package_removed=owned_package, package_absent_after=owned_package,
-            removed_uploads=tuple(u.remote_path for u in owned.uploads),
-            unconfirmed_uploads=(), recovery_needed=False)
+            removed_uploads=uploads, unconfirmed_uploads=(), recovery_needed=False)
 
     def close(self):
         self.provider.closed += 1
+        if self.close_error is not None:
+            raise self.close_error
 
 
 class LiveCase(unittest.TestCase):
@@ -243,6 +316,10 @@ class LiveCase(unittest.TestCase):
     def files(self, out=None):
         out = Path(out or self.out_dir)
         return {name: out / name for name in (*lc.ARTIFACT_NAMES, lc.COLLECTION_NAME)}
+
+    def assert_no_artifacts(self, out=None):
+        for name, path in self.files(out).items():
+            self.assertFalse(path.exists(), name)
 
 
 # ---------------------------------------------------------------- positive path
@@ -335,25 +412,26 @@ class AdapterRefusalTests(LiveCase):
         ops = FakeOps(native_token="session-B")
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=ops))
-        self.assertFalse(self.out_dir.exists())
+        self.assert_no_artifacts()
 
     def test_mixed_target_binding_refuses(self):
         ops = FakeOps(native_binding=object())
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=ops))
-        self.assertFalse(self.out_dir.exists())
+        self.assert_no_artifacts()
 
     def test_native_nonzero_exit_with_valid_looking_frame_refuses(self):
         ops = FakeOps(exit_code=1)
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=ops))
-        self.assertFalse(self.out_dir.exists())
+        self.assert_no_artifacts()
 
     def test_transport_trailer_is_not_stripped_by_the_collector(self):
         # frame.py refuses unknown noise; only the adapter may strip exactly one trailer.
         ops = FakeOps(frame=_encode(native_doc()) + b"[exit:0]\n")
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=ops))
+        self.assert_no_artifacts()
 
     def test_provider_error_is_not_echoed_and_cleanup_is_reconciled(self):
         ops = FakeOps(fail_on="install", reconcile_unknown=True)
@@ -376,6 +454,137 @@ class AdapterRefusalTests(LiveCase):
         self.assertEqual(status["cleanup"]["status"], "recovery-needed")
 
 
+class FrozenBindingTests(LiveCase):
+    """The session pair is frozen at open and checked after each op / before each op."""
+
+    def assert_no_provider_text(self, exc):
+        self.assertNotIn(SECRET_MARKER, str(exc))
+        self.assertNotIn(SECRET_MARKER, "".join(traceback.format_exception(exc)))
+
+    def test_wrong_absence_token_or_binding_refuses_before_install(self):
+        for label, kw in {
+            "token": dict(absence_token="SYNTHETIC-OTHER-SESSION"),
+            "binding": dict(absence_binding=object()),
+        }.items():
+            with self.subTest(case=label):
+                ops = FakeOps(**kw)
+                with self.assertRaises(lc.LiveCollectionError) as ctx:
+                    lc.collect_reports(**self.kwargs(ops=ops))
+                self.assertEqual([call[0] for call in ops.calls], ["assert_absent"])
+                self.assertEqual(ops.uninstalled, [])
+                self.assert_no_provider_text(ctx.exception)
+                self.assertFalse(self.out_dir.exists())
+
+    def test_changed_session_binding_between_ops_refuses_before_the_next_write(self):
+        ops = FakeOps(drift_after="assert_absent")
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assert_no_provider_text(ctx.exception)
+        self.assertEqual([call[0] for call in ops.calls], ["assert_absent"])
+        self.assertEqual(ops.uninstalled, [])
+        self.assertEqual(ops.cleaned, [])        # never reconcile a changed target
+        self.assertFalse(self.out_dir.exists())
+
+    def test_session_open_failure_is_finite_and_not_echoed(self):
+        ops = FakeOps(session_error=RuntimeError(SECRET_MARKER))
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assert_no_provider_text(ctx.exception)
+        self.assertEqual(ops.calls, [])
+        self.assertFalse(self.out_dir.exists())
+
+    def test_cleanup_scoped_to_the_initial_binding_never_uninstalls_a_drifted_target(self):
+        # Binding changes after install: cleanup is skipped even though ownership exists.
+        ops = FakeOps(drift_after="install")
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assertIn("install_widget", [call[0] for call in ops.calls])
+        self.assertEqual(ops.uninstalled, [])
+        self.assertEqual(ops.cleaned, [])
+        self.assertIn("recovery", str(ctx.exception).lower())
+        status = json.loads((self.out_dir / lc.COLLECTION_NAME).read_text("utf-8"))
+        self.assertEqual(status["cleanup"]["status"], "recovery-needed")
+        self.assertEqual(status["namespace"]["installAttempted"], True)
+        self.assertEqual(len(status["namespace"]["uploads"]), 1)
+
+
+class ProviderFailureContainmentTests(LiveCase):
+    def test_op_runtime_error_and_malicious_livecollectionerror_are_not_echoed(self):
+        for label, exc in {
+            "runtime": RuntimeError(SECRET_MARKER),
+            "live": lc.LiveCollectionError(SECRET_MARKER),
+        }.items():
+            with self.subTest(kind=label):
+                out = self.root / f"out-{label}"
+                ops = FakeOps(fail_on="install", fail_exc=exc, reconcile_unknown=True)
+                with self.assertRaises(lc.LiveCollectionError) as ctx:
+                    lc.collect_reports(**self.kwargs(ops=ops, out_dir=str(out)))
+                self.assertNotIn(SECRET_MARKER, str(ctx.exception))
+                self.assertNotIn(SECRET_MARKER, "".join(traceback.format_exception(ctx.exception)))
+                self.assertIn("recovery", str(ctx.exception).lower())
+                self.assertNotIn(SECRET_MARKER, (out / lc.COLLECTION_NAME).read_text("utf-8"))
+
+    def test_both_primary_and_cleanup_failure_surface_recovery_first(self):
+        ops = FakeOps(fail_on="install", reconcile_unknown=True)
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assertIn("recovery", str(ctx.exception).lower())
+        self.assertNotIn(SECRET_MARKER, str(ctx.exception))
+        status = json.loads((self.out_dir / lc.COLLECTION_NAME).read_text("utf-8"))
+        self.assertEqual(status["cleanup"]["status"], "recovery-needed")
+        self.assertEqual(status["primaryFailure"]["category"], "refused")
+        namespace = status["namespace"]
+        self.assertEqual(namespace["packageId"], PACKAGE)
+        self.assertRegex(namespace["remoteRunDir"], r"/tmp/quiettv-collect-[0-9a-f]{32}$")
+        self.assertEqual(namespace["absenceConfirmed"], True)
+        self.assertEqual(namespace["installAttempted"], True)
+        self.assertEqual([u["sha256"] for u in namespace["uploads"]], [sha(self.wgt_bytes)])
+        self.assertNotIn("session-A", (self.out_dir / lc.COLLECTION_NAME).read_text("utf-8"))
+        self.assertNotIn(SECRET_MARKER, (self.out_dir / lc.COLLECTION_NAME).read_text("utf-8"))
+
+    def test_malformed_cleanup_report_types_are_finite(self):
+        ops = FakeOps(malformed_cleanup=True)
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assertIn("recovery", str(ctx.exception).lower())
+        self.assertNotIn(SECRET_MARKER, str(ctx.exception))
+        self.assertNotIn(SECRET_MARKER, "".join(traceback.format_exception(ctx.exception)))
+        self.assertNotIn(SECRET_MARKER, (self.out_dir / lc.COLLECTION_NAME).read_text("utf-8"))
+
+    def test_cleanup_exception_is_finite_and_keeps_a_recovery_record(self):
+        ops = FakeOps(cleanup_error=RuntimeError(SECRET_MARKER))
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assertIn("recovery", str(ctx.exception).lower())
+        self.assertNotIn(SECRET_MARKER, str(ctx.exception))
+        self.assertEqual(json.loads((self.out_dir / lc.COLLECTION_NAME).read_text(
+            "utf-8"))["cleanup"]["status"], "recovery-needed")
+
+    def test_partial_install_cleanup_may_confirm_absence_without_uninstalling(self):
+        ops = FakeOps(fail_on="install", reconcile_absent_after=True)
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assertNotIn("recovery", str(ctx.exception).lower())
+        self.assertEqual(ops.uninstalled, [])
+        self.assert_no_artifacts()
+
+    def test_cleanup_removing_a_package_it_never_owned_is_refused(self):
+        ops = FakeOps(absent=False, reconcile_remove_unowned=True)
+        with self.assertRaises(lc.LiveCollectionError) as ctx:
+            lc.collect_reports(**self.kwargs(ops=ops))
+        self.assertIn("recovery", str(ctx.exception).lower())
+        self.assertEqual(ops.uninstalled, [PACKAGE])   # the provider did the unsafe thing
+        self.assertFalse(self.out_dir.exists())        # no install happened, so no record needed
+
+    def test_output_dir_allocation_failure_happens_before_the_first_tv_write(self):
+        with mock.patch.object(lc, "_create_out_dir",
+                               side_effect=lc.LiveCollectionError(
+                                   "the output directory could not be created")):
+            with self.assertRaises(lc.LiveCollectionError):
+                lc.collect_reports(**self.kwargs())
+        self.assertEqual([call[0] for call in self.ops.calls], ["assert_absent"])
+
+
 class ObservationRefusalTests(LiveCase):
     def assert_refused_before_push(self, report=None, frame=None, exit_code=0, *, before_push=True):
         ops = FakeOps(report=report, frame=frame, exit_code=exit_code)
@@ -384,7 +593,7 @@ class ObservationRefusalTests(LiveCase):
         kinds = [call[0] for call in ops.calls]
         if before_push:
             self.assertNotIn("push_native", kinds)
-        self.assertFalse(self.out_dir.exists())
+        self.assert_no_artifacts()
 
     def test_oversize_report_refused(self):
         self.assert_refused_before_push(report=b"{" + b"x" * liveops.MAX_REPORT_BYTES)
@@ -411,13 +620,13 @@ class ObservationRefusalTests(LiveCase):
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=ops))
         self.assertIn("install_widget", [call[0] for call in ops.calls])
-        self.assertFalse(self.out_dir.exists())
+        self.assert_no_artifacts()
 
     def test_failed_native_run_refused(self):
         ops = FakeOps(frame=failed_frame())
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=ops))
-        self.assertFalse(self.out_dir.exists())
+        self.assert_no_artifacts()
 
     def test_native_output_over_cap_refused(self):
         # The native run necessarily happens after its push; the cap is still a refusal.
@@ -505,6 +714,7 @@ class ContainmentTests(LiveCase):
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs())
         self.assertEqual(list(self.out_dir.iterdir()), [])
+        self.assertEqual(self.ops.calls, [])  # refused before any TV session
 
     def test_operator_assertions_are_required(self):
         for kw in (dict(operator_trust_policy_and_profile=False),
@@ -554,6 +764,29 @@ class RegistryAndCliTests(LiveCase):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             cli.main(argv)
 
+    def test_cli_never_prints_provider_failure_text(self):
+        cli = self._cli()
+        liveops.LIVEOPS["leak-test"] = lambda: FakeOps(
+            fail_on="install", fail_exc=RuntimeError(SECRET_MARKER), reconcile_unknown=True)
+        argv = ["--adapter", "leak-test", "--out-dir", str(self.out_dir),
+                "--signed-wgt", str(self.wgt_path), "--wgt-sha256", sha(self.wgt_bytes),
+                "--inspector-dll", str(self.native["dll"]), "--dll-sha256", sha(DLL),
+                "--inspector-runtimeconfig", str(self.native["runtimeconfig"]),
+                "--runtimeconfig-sha256", sha(RUNTIMECONFIG),
+                "--inspector-deps", str(self.native["deps"]), "--deps-sha256", sha(DEPS),
+                "--package-id", PACKAGE, "--policy", str(self.sources["policy"]),
+                "--profile", str(self.sources["profile"]),
+                "--operator-trust-policy-and-profile", "--operator-paired-from-same-tv"]
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = cli.main(argv)
+        finally:
+            liveops.LIVEOPS.pop("leak-test", None)
+        self.assertEqual(rc, 2)
+        self.assertIn("collect refused", err.getvalue())
+        self.assertNotIn(SECRET_MARKER, out.getvalue() + err.getvalue())
+
 
 # ---------------------------------------------------------------- guard-off controls
 # Each control removes ONE isolated guard in memory and shows the exact trap the guard
@@ -580,8 +813,9 @@ class GuardOffControls(LiveCase):
         with self.assertRaises(lc.LiveCollectionError):
             lc.collect_reports(**self.kwargs(ops=FakeOps(native_token="session-B")))
         ops = FakeOps(native_token="session-B")
-        with mock.patch.object(lc, "_require_same_session", lambda session, run_id, results: None):
-            summary = lc.collect_reports(**self.kwargs(ops=ops))
+        with mock.patch.object(lc, "_require_session_echo", lambda result, frozen: None):
+            summary = lc.collect_reports(**self.kwargs(
+                ops=ops, out_dir=str(self.root / "out-guard-off")))
         self.assertEqual(summary["status"], "collected")   # guard removed -> mixed pair accepted
 
 

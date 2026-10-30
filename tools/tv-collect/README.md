@@ -37,6 +37,13 @@ The public registry `LIVEOPS` is empty. A parent-owned reviewed adapter:
 explicitly trusted code and guarantees the target binding and fresh operation
 execution; no attestation is claimed.
 
+**Binding is frozen at open.** The collector reads the opaque token/binding once
+immediately after the session opens, checks every typed result against that pair
+right after each operation, and re-reads the live pair before every subsequent
+operation (starting before the install that follows `assert_absent`). A changed
+pair is refused before the next write. There is no async-provider race
+guarantee: an adapter that mutates its target mid-session is out of contract.
+
 ## Inputs (all required, all validated before any TV operation)
 
 | input | rule |
@@ -100,16 +107,38 @@ All files are created with create-new semantics and owner-only permissions
 through `helper/owner_init.py`. No raw DUID, target address, session token or
 credential is written or printed. Stdout is a finite sanitized summary only.
 
+The output directory is allocated after all local validation and **before the
+first TV write**, so a failed mkdir/ACL cannot leave TV changes without a
+recovery record.
+
 ## Cleanup and failure
 
-Cleanup always runs after a session opens, including partial failures.
+Cleanup always runs after a session opens, including partial failures, but only
+against the session that still holds the token/binding frozen at open. A
+changed target is never "fixed": its cleanup is skipped and recovery is
+recorded instead. With empty ownership (no install attempt, no uploads) no
+package is ever uninstalled.
+
 Ownership is tracked as intents (absence confirmed, install attempted, exact
 uploads). The adapter reconciles before removal; an install that failed does
 not mean no writes occurred, and a package is never uninstalled unless absence
-was proven first. If ownership or cleanup cannot be confirmed, the run writes
-`collection.json` with `"cleanup": {"status": "recovery-needed"}`, keeps the
-artifacts, and refuses — it never reports success after a failed cleanup.
-Provider error text is never echoed.
+was proven first. A partial/failed install may legitimately leave nothing:
+`package_removed=false, package_absent_after=true` is a confirmed clean state,
+not a failure.
+
+If ownership or cleanup cannot be confirmed, the run writes `collection.json`
+with `"cleanup": {"status": "recovery-needed"}` and a private `namespace` block
+(package id, tool-computed remote run dir, and every expected upload path +
+SHA-256) so the owner can find this run's own partial uploads. It keeps the
+artifacts and refuses — it never reports success after a failed cleanup. When a
+primary failure and a cleanup failure coexist, the recovery-required error is
+raised first; the primary failure is recorded only as a finite category.
+
+Every unexpected provider exception — at session open, each operation, close,
+cleanup or cleanup-result validation, including a `RuntimeError` or a
+provider-raised `LiveCollectionError` with an unsafe message — is converted to
+a fixed, non-secret `LiveCollectionError` without echoing or chaining provider
+text. The CLI never prints a traceback for those.
 
 ## How to build and run (parent-owned)
 

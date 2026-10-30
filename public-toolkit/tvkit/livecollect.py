@@ -32,6 +32,32 @@ refused without touching it. There is no pre-clean and no nonce.
 The session token is CORRELATION, not cryptographic proof. The adapter is
 explicitly trusted code; it guarantees one target binding and that the fresh
 operations really ran. Nothing here claims a tamper-proof session attestation.
+
+Binding is frozen at session open
+---------------------------------
+
+The collector reads the session's opaque token/binding ONCE, immediately after
+the session opens, and then:
+
+* checks every typed result against that frozen pair right after the operation;
+* re-reads the live session pair and refuses BEFORE every subsequent operation,
+  starting with the install that follows ``assert_absent``; and
+* at cleanup, only asks the initial bound session to reconcile its own
+  namespace. If the pair no longer matches, it never calls cleanup on the new
+  target (that could uninstall unrelated data) and records recovery instead.
+
+There is no async-provider race guarantee: an adapter that mutates its binding
+concurrently is outside this contract and is refused at the next check.
+
+Unexpected provider failures are contained
+------------------------------------------
+
+Every call into the adapter (session open, each operation, cleanup, close and
+the shape of a cleanup report) converts any unexpected ``Exception`` - including
+``RuntimeError``/``KeyError`` or a provider-raised ``LiveCollectionError`` with
+an unsafe message - into a fixed, non-secret :class:`LiveCollectionError`
+without echoing or chaining provider text. ``KeyboardInterrupt``/``SystemExit``
+may propagate after cleanup.
 """
 
 from __future__ import annotations
@@ -425,17 +451,8 @@ def _load_profile(value: str) -> tuple[Path, tvprofile.Profile]:
 
 # ---- adapter result checks (small, isolated guards) ----
 
-def _require_result(result: Any, label: str, run_id: str) -> None:
-    if not isinstance(result, liveops.OpResult):
-        _fail(f"{label} did not return a typed result; refusing")
-    if result.ok is not True:
-        _fail(f"{label} did not report success; refusing")
-    if result.run_id != run_id:
-        _fail(f"{label} did not echo this run's request tag; refusing")
-
-
-def _require_same_session(session: liveops.LiveSession, run_id: str, results: list) -> None:
-    """Every result must name this run and this session's opaque token/binding."""
+def _read_session_identity(session: liveops.LiveSession) -> tuple[str, object]:
+    """Read the opaque session pair once, converting provider errors finitely."""
     try:
         token = session.session_token
         binding = session.binding
@@ -443,9 +460,56 @@ def _require_same_session(session: liveops.LiveSession, run_id: str, results: li
         _fail("the live-operations session could not expose its binding; refusing")
     if type(token) is not str or not token:
         _fail("the live-operations session token is malformed; refusing")
+    if binding is None:
+        _fail("the live-operations session binding is missing; refusing")
+    return token, binding
+
+
+def _session_matches(session: liveops.LiveSession, frozen: tuple[str, object]) -> bool:
+    """Non-raising comparison used by cleanup to stay on the initial binding."""
+    try:
+        token = session.session_token
+        binding = session.binding
+        return token == frozen[0] and binding is frozen[1]
+    except Exception:
+        return False
+
+
+def _require_session_current(session: liveops.LiveSession, frozen: tuple[str, object]) -> None:
+    """Refuse before the NEXT operation if the bound target changed since open."""
+    token, binding = _read_session_identity(session)
+    if token != frozen[0] or binding is not frozen[1]:
+        _fail("the live-operations session changed target; refusing before the next operation")
+
+
+def _require_session_echo(result: liveops.OpResult, frozen: tuple[str, object]) -> None:
+    """One typed result must echo the EXACT token/binding frozen at session open."""
+    if result.session_token != frozen[0] or result.binding is not frozen[1]:
+        _fail("the adapter mixed sessions or targets; refusing a cross-session pair")
+
+
+def _require_result(result: Any, label: str, run_id: str,
+                    frozen: tuple[str, object]) -> None:
+    try:
+        if not isinstance(result, liveops.OpResult):
+            _fail(f"{label} did not return a typed result; refusing")
+        if result.ok is not True:
+            _fail(f"{label} did not report success; refusing")
+        if result.run_id != run_id:
+            _fail(f"{label} did not echo this run's request tag; refusing")
+        _require_session_echo(result, frozen)
+    except LiveCollectionError:
+        raise
+    except Exception:
+        _fail(f"{label} did not return a usable typed result; refusing")
+
+
+def _require_same_session(session: liveops.LiveSession, frozen: tuple[str, object],
+                          results: list) -> None:
+    """Final belt-and-braces check of every result and the live session pair."""
+    _require_session_current(session, frozen)
     for result in results:
-        if result.session_token != token or result.binding is not binding:
-            _fail("the adapter mixed sessions or targets; refusing a cross-session pair")
+        _require_session_echo(result, frozen)
 
 
 def _require_absence(result: Any) -> None:
@@ -472,6 +536,13 @@ def _require_launch(result: Any) -> None:
 def _require_cleanup(cleanup: Any, owned: liveops.OwnedRun) -> None:
     if not isinstance(cleanup, liveops.CleanupReport):
         _fail("cleanup did not return a typed reconciliation; recovery is needed")
+    for field in ("package_removed", "package_absent_after", "recovery_needed"):
+        if getattr(cleanup, field) is not True and getattr(cleanup, field) is not False:
+            _fail("cleanup returned a malformed reconciliation; recovery is needed")
+    for field in ("removed_uploads", "unconfirmed_uploads"):
+        value = getattr(cleanup, field)
+        if type(value) is not tuple or any(type(path) is not str or not path for path in value):
+            _fail("cleanup returned a malformed upload list; recovery is needed")
     expected = {upload.remote_path for upload in owned.uploads}
     removed = set(cleanup.removed_uploads)
     if cleanup.recovery_needed:
@@ -480,23 +551,36 @@ def _require_cleanup(cleanup: Any, owned: liveops.OwnedRun) -> None:
         _fail("cleanup left one of this run's uploads unconfirmed; recovery is needed")
     if removed - expected:
         _fail("cleanup removed a path this run did not own; recovery is needed")
-    if not owned.absence_confirmed and cleanup.package_removed:
+    if cleanup.package_removed and not (owned.absence_confirmed and owned.install_attempted):
         _fail("cleanup removed a package this run did not prove it owned; recovery is needed")
-    if owned.absence_confirmed and owned.install_attempted:
-        if not (cleanup.package_removed is True and cleanup.package_absent_after is True):
+    if cleanup.package_removed and cleanup.package_absent_after is not True:
+        _fail("cleanup removed the package but did not confirm it is gone; recovery is needed")
+    if owned.install_attempted:
+        # A partial or failed install may legitimately leave no package behind:
+        # the adapter can confirm absence without having uninstalled anything.
+        if cleanup.package_removed is not True and cleanup.package_absent_after is not True:
             _fail("cleanup did not confirm the diagnostic package is gone; recovery is needed")
 
 
 def _adapter_call(fn, *args):
-    """Call one adapter operation, converting its error into a finite refusal."""
+    """Call one adapter operation, converting ANY provider exception finitely.
+
+    A provider-raised ``LiveCollectionError`` is caught here too: its message may
+    be unsafe, so it never reaches the caller or the traceback. No chaining.
+    """
     try:
         return fn(*args)
-    except LiveCollectionError:
-        raise
-    except liveops.LiveOpsError:
-        raise LiveCollectionError("the live-operations adapter refused or failed; no success is claimed") from None
-    except (OSError, ValueError, TypeError):
+    except Exception:
         raise LiveCollectionError("a live operation failed; no success is claimed") from None
+
+
+def _failure_category(exc: BaseException) -> str:
+    """A finite, non-sensitive category for the private recovery record."""
+    if isinstance(exc, LiveCollectionError):
+        return "refused"
+    if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+        return "interrupted"
+    return "unexpected"
 
 
 # ---- owner-private outputs ----
@@ -550,7 +634,14 @@ def _write_outputs(out: Path, report: bytes, frame: bytes, receipt: fj.JoinRecei
     return written
 
 
-def _collection_doc(run_id: str, meta: dict | None, cleanup_status: str) -> dict:
+def _needs_recovery(owned: liveops.OwnedRun, meta: dict | None) -> bool:
+    """Whether this run could have left anything on the TV or in the output dir."""
+    return meta is not None or owned.install_attempted or bool(owned.uploads)
+
+
+def _collection_doc(run_id: str, meta: dict | None, cleanup_status: str,
+                    owned: liveops.OwnedRun | None = None,
+                    primary_category: str | None = None) -> dict:
     doc = {
         "schema": COLLECTION_SCHEMA,
         "collectionId": run_id,
@@ -559,25 +650,54 @@ def _collection_doc(run_id: str, meta: dict | None, cleanup_status: str) -> dict
                  "claims two fresh same-session artifacts and a join only; it makes no "
                  "boot, root or launcher claim and enables no action."),
     }
+    if owned is not None:
+        # Owner-private recovery map: the exact tool-computed namespace and the
+        # expected hashes of every artifact this run pushed or attempted to push.
+        # No session token, binding, credential or target address is recorded.
+        doc["namespace"] = {
+            "packageId": owned.package_id,
+            "remoteRunDir": liveops.remote_run_dir(run_id),
+            "absenceConfirmed": owned.absence_confirmed,
+            "installAttempted": owned.install_attempted,
+            "uploads": [{"path": upload.remote_path, "sha256": upload.sha256}
+                        for upload in owned.uploads],
+        }
     if meta:
         doc["artifacts"] = dict(meta.get("artifactHashes", {}))
         doc["receiptDigest"] = meta.get("receiptDigest")
         doc["profileId"] = meta.get("profileId")
         doc["policyDigest"] = meta.get("policyDigest")
+    if primary_category is not None:
+        doc["primaryFailure"] = {
+            "category": primary_category,
+            "recoveryNeeded": cleanup_status == "recovery-needed",
+        }
     return doc
 
 
 def _finish(session: liveops.LiveSession | None, owned: liveops.OwnedRun, out_dir: str,
-            run_id: str, meta: dict | None, body_complete: bool,
-            out_state: dict) -> LiveCollectionError | None:
+            run_id: str, meta: dict | None, body_complete: bool, out_state: dict,
+            frozen: tuple[str, object] | None,
+            primary_category: str | None) -> LiveCollectionError | None:
     """Reconcile/close the session, then write collection.json. Returns an error, never raises."""
     error: LiveCollectionError | None = None
     cleanup = None
+    recovery_required = False
     if session is not None:
-        try:
-            cleanup = session.close_owned_run(owned)
-        except Exception:
-            error = LiveCollectionError("cleanup failed; this run's namespace needs recovery")
+        if frozen is None or not _session_matches(session, frozen):
+            # The live pair changed after open: NEVER run cleanup against the new
+            # target. Only this run's own, already-written artifacts need recovery.
+            if _needs_recovery(owned, meta):
+                recovery_required = True
+                error = LiveCollectionError(
+                    "the live-operations session changed target; recovery is needed")
+        else:
+            try:
+                cleanup = session.close_owned_run(owned)
+            except Exception:
+                recovery_required = True
+                error = LiveCollectionError(
+                    "cleanup failed; this run's namespace needs recovery")
         try:
             session.close()
         except Exception:
@@ -587,23 +707,30 @@ def _finish(session: liveops.LiveSession | None, owned: liveops.OwnedRun, out_di
         try:
             _require_cleanup(cleanup, owned)
         except LiveCollectionError as exc:
+            recovery_required = True
             error = exc
+        except Exception:
+            recovery_required = True
+            error = LiveCollectionError(
+                "cleanup returned a malformed reconciliation; recovery is needed")
     if error is None:
         if body_complete:
             try:
                 out = _state_out_dir(out_state, out_dir)
                 _write_new(out / COLLECTION_NAME, _owner_init().json_bytes(
-                    _collection_doc(run_id, meta, "complete")))
+                    _collection_doc(run_id, meta, "complete", owned)))
             except LiveCollectionError as exc:
                 error = exc
         return error
-    # Cleanup failed or was unconfirmed: retain a private, explicit recovery status.
-    try:
-        out = _state_out_dir(out_state, out_dir)
-        _write_new(out / COLLECTION_NAME, _owner_init().json_bytes(
-            _collection_doc(run_id, meta, "recovery-needed")))
-    except LiveCollectionError:
-        pass
+    # Namespace cleanup failed or was unconfirmed: retain a private, explicit
+    # recovery status. A plain close failure after confirmed cleanup does not.
+    if recovery_required and _needs_recovery(owned, meta):
+        try:
+            out = _state_out_dir(out_state, out_dir)
+            _write_new(out / COLLECTION_NAME, _owner_init().json_bytes(
+                _collection_doc(run_id, meta, "recovery-needed", owned, primary_category)))
+        except LiveCollectionError:
+            pass
     return error
 
 
@@ -632,7 +759,13 @@ def collect_reports(*, ops: liveops.LiveOps, out_dir: str, package_id: str,
     """
     if operator_trust_policy_and_profile is not True or operator_paired_from_same_tv is not True:
         _fail("both operator trust assertions must be given explicitly; refusing to manufacture consent")
-    if not isinstance(ops, liveops.LiveOps) or ops.implemented is not True:
+    if not isinstance(ops, liveops.LiveOps):
+        _fail("no implemented live-operations adapter was supplied; refusing")
+    try:
+        implemented = ops.implemented
+    except Exception:
+        _fail("no implemented live-operations adapter was supplied; refusing")
+    if implemented is not True:
         _fail("no implemented live-operations adapter was supplied; refusing")
     oi = _owner_init()
     try:
@@ -678,40 +811,48 @@ def collect_reports(*, ops: liveops.LiveOps, out_dir: str, package_id: str,
                                  install_attempted=False, uploads=())
     out_state: dict = {"path": None}
     session = None
+    frozen: tuple[str, object] | None = None
     meta: dict | None = None
     primary: BaseException | None = None
     try:
         try:
             session = ops.session(run_id)
-        except LiveCollectionError:
-            raise
-        except liveops.LiveOpsError:
-            raise LiveCollectionError("the live-operations adapter could not open a session") from None
-        except (OSError, ValueError, TypeError):
+        except Exception:
             raise LiveCollectionError("the live-operations adapter could not open a session") from None
         if not isinstance(session, liveops.LiveSession):
             _fail("the live-operations adapter returned an untyped session; refusing")
+        # Freeze the opaque pair ONCE, before the first operation.
+        frozen = _read_session_identity(session)
 
+        _require_session_current(session, frozen)  # before assert_absent
         results: list = []
         absence = _adapter_call(session.assert_absent, pkg, paths)
-        _require_result(absence, "namespace absence", run_id)
+        _require_result(absence, "namespace absence", run_id, frozen)
         _require_absence(absence)
         results.append(absence)
         ownership = replace(ownership, absence_confirmed=True)
 
+        # Refuse a changed target BEFORE the first write, then allocate the
+        # owner-private output dir so a failed mkdir/ACL cannot leave TV changes
+        # without a recovery record.
+        _require_session_current(session, frozen)
+        _state_out_dir(out_state, str(out_dir))
+
         ownership = replace(ownership, install_attempted=True, uploads=(wgt_upload,))
         install = _adapter_call(session.install_widget, pkg, wgt_bytes, wgt_sha, remote_wgt)
-        _require_result(install, "widget install", run_id)
+        _require_result(install, "widget install", run_id, frozen)
         _require_install(install)
         results.append(install)
 
+        _require_session_current(session, frozen)
         launch = _adapter_call(session.launch_facts, pkg)
-        _require_result(launch, "widget launch", run_id)
+        _require_result(launch, "widget launch", run_id, frozen)
         _require_launch(launch)
         results.append(launch)
 
+        _require_session_current(session, frozen)
         report = _adapter_call(session.read_report, pkg, paths)
-        _require_result(report, "report read", run_id)
+        _require_result(report, "report read", run_id, frozen)
         if not isinstance(report, liveops.ReportResult):
             _fail("the report read did not return a typed result; refusing")
         if type(report.data) is not bytes:
@@ -726,13 +867,15 @@ def collect_reports(*, ops: liveops.LiveOps, out_dir: str, package_id: str,
             _fail("the ProductInfo report is incomplete, malformed or carries a raw identity; refusing")
         results.append(report)
 
+        _require_session_current(session, frozen)
         ownership = replace(ownership, uploads=(wgt_upload, *native_uploads))
         push = _adapter_call(session.push_native, native_uploads, run_dir)
-        _require_result(push, "native push", run_id)
+        _require_result(push, "native push", run_id, frozen)
         results.append(push)
 
+        _require_session_current(session, frozen)
         native = _adapter_call(session.run_native, remote_dll)
-        _require_result(native, "native run", run_id)
+        _require_result(native, "native run", run_id, frozen)
         if not isinstance(native, liveops.NativeResult):
             _fail("the native run did not return a typed result; refusing")
         if type(native.stdout) is not bytes:
@@ -743,7 +886,7 @@ def collect_reports(*, ops: liveops.LiveOps, out_dir: str, package_id: str,
             _fail("the native inventory output is larger than the accepted bound; refusing")
         results.append(native)
 
-        _require_same_session(session, run_id, results)
+        _require_same_session(session, frozen, results)
 
         try:
             receipt = fj.join(report.data, native.stdout, policy=policy_obj, profile=profile_obj)
@@ -794,10 +937,13 @@ def collect_reports(*, ops: liveops.LiveOps, out_dir: str, package_id: str,
     except BaseException as exc:  # noqa: BLE001 - re-raised below after cleanup
         primary = exc
     finally:
-        cleanup_error = _finish(session, ownership, str(out_dir), run_id, meta, primary is None, out_state)
+        cleanup_error = _finish(
+            session, ownership, str(out_dir), run_id, meta, primary is None, out_state,
+            frozen, _failure_category(primary) if primary is not None else None)
 
+    # Required recovery takes precedence: never hide it behind the primary error.
+    if cleanup_error is not None:
+        raise cleanup_error from None
     if primary is not None:
         raise primary
-    if cleanup_error is not None:
-        raise cleanup_error
     return summary

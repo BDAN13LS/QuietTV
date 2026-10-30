@@ -88,6 +88,12 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError):
         print("collect refused: a local operation failed", file=sys.stderr)
         return 2
+    except Exception:
+        # An adapter or local failure with an unsafe message must never produce a
+        # traceback (which could echo provider text). KeyboardInterrupt still exits.
+        print("collect refused: an unexpected failure occurred; no success is claimed",
+              file=sys.stderr)
+        return 2
     print(json.dumps(summary, indent=2))
     return 0
 

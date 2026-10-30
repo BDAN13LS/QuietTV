@@ -24,6 +24,17 @@ What this contract deliberately is NOT
 
 Writes are limited to this run's own namespace: the tool-computed package id,
 the exact remote upload paths handed in, and nothing else.
+
+Binding stability
+-----------------
+
+``session_token``/``binding`` are opaque and identity-compared only. The
+collector freezes the pair once at session open, checks each result against it
+immediately after every operation, re-checks the live pair before every
+subsequent operation, and at cleanup asks only the session that still holds the
+initial pair to reconcile its own namespace. No async-provider race guarantee is
+offered: an adapter that changes its target mid-session is refused before the
+next operation, and a changed target is never "fixed" by uninstalling anything.
 """
 
 from __future__ import annotations
@@ -185,6 +196,10 @@ class CleanupReport:
     before this run) before uninstalling, and must remove only the exact upload
     paths listed in the :class:`OwnedRun`, re-checked by their expected hash.
     ``recovery_needed`` is true when it could not confirm either half.
+
+    A failed or partial install may leave no package behind: reporting
+    ``package_removed=False`` with ``package_absent_after=True`` is a confirmed
+    clean state (no mutation was needed), not a failure.
     """
 
     package_removed: bool
@@ -200,6 +215,11 @@ class LiveSession(abc.ABC):
     ``close_owned_run`` reconciles this run's own namespace before ``close``;
     ``close`` releases only this session's resources and must never disconnect a
     shared SDK client, kill a server, or change a host setting.
+
+    The token and binding must stay stable for the session's whole life. The
+    collector freezes them at open, refuses before the next operation if they
+    change, and will not call ``close_owned_run`` on a session whose pair no
+    longer matches, so a drifted target can never be uninstalled.
     """
 
     run_id: str = ""
@@ -284,6 +304,12 @@ def get_liveops(name: str | None) -> LiveOps:
     except Exception:
         # Never echo a factory's own message: it could carry a credential or target.
         raise LiveOpsError("the live-operations adapter could not be constructed") from None
-    if not isinstance(ops, LiveOps) or not ops.implemented:
+    if not isinstance(ops, LiveOps):
+        raise LiveOpsError("the live-operations adapter is not implemented; refusing")
+    try:
+        implemented = ops.implemented
+    except Exception:
+        raise LiveOpsError("the live-operations adapter is not implemented; refusing") from None
+    if implemented is not True:
         raise LiveOpsError("the live-operations adapter is not implemented; refusing")
     return ops
