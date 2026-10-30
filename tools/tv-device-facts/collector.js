@@ -214,18 +214,16 @@
     }
     return Promise.resolve(digestPromise).then(
       function (buf) {
-        var arr;
-        try {
-          arr = new Uint8Array(buf);
-        } catch (e) {
+        // A SHA-256 digest is an ArrayBuffer of exactly 32 bytes. Reject anything else (a number,
+        // string, null, plain object, or a buffer of another size) as hash-invalid BEFORE building
+        // a typed view: `new Uint8Array(32)` would otherwise be read as 32 zero bytes, and a huge
+        // numeric would allocate before any length check. `instanceof` is evaluated first and
+        // short-circuits the ||, so a hostile result's properties are never read.
+        if (!(buf instanceof ArrayBuffer) || buf.byteLength !== SHA256_BYTES) {
           record.status = "hash-invalid";
           return record;
         }
-        if (arr.length !== SHA256_BYTES) {
-          record.status = "hash-invalid"; // a SHA-256 digest is exactly 32 bytes
-          return record;
-        }
-        record.digest = toHex(arr);
+        record.digest = toHex(new Uint8Array(buf));
         record.status = "observed";
         return record;
       },

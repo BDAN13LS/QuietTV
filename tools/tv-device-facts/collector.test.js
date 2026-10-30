@@ -291,6 +291,72 @@ test("REGRESSION: a malformed (wrong-length) digest result is refused", async ()
   assert.equal(result.status, "incomplete");
 });
 
+test("REGRESSION: a numeric digest result is refused, not read as zero bytes", async () => {
+  // subtle.digest resolving to the number 32 must NOT become a 32-zero-byte "digest".
+  const pi = recordingProductInfo();
+  const { deps } = baseDeps(pi.proxy, {
+    subtle: {
+      digest() {
+        return Promise.resolve(32);
+      },
+    },
+  });
+  const { result } = await C.collect(deps);
+  assert.equal(result.identity.status, "hash-invalid");
+  assert.ok(!("digest" in result.identity));
+  assert.equal(result.status, "incomplete");
+});
+
+test("REGRESSION: a non-ArrayBuffer digest is refused BEFORE any allocation/read", async () => {
+  // A hostile result stands in for an oversized numeric: the type guard must reject it WITHOUT
+  // reading its properties, so no typed view is built and no memory is allocated. The sentinel
+  // flags (and throws on) any property access, which is exactly what Uint8Array construction does.
+  let touched = false;
+  const sentinel = new Proxy(
+    {},
+    {
+      get(_t, prop) {
+        // Reading `.then` is the Promise machinery checking for a thenable, not an allocation; keep
+        // the sentinel a plain value by returning undefined. Any OTHER read (Symbol.iterator,
+        // length, an index, byteLength) is what building a typed view would do, so flag and throw.
+        if (prop === "then") {
+          return undefined;
+        }
+        touched = true;
+        throw new Error("digest result was read for allocation");
+      },
+    }
+  );
+  const pi = recordingProductInfo();
+  const { deps } = baseDeps(pi.proxy, {
+    subtle: {
+      digest() {
+        return Promise.resolve(sentinel);
+      },
+    },
+  });
+  const { result } = await C.collect(deps);
+  assert.equal(result.identity.status, "hash-invalid");
+  assert.ok(!touched, "the digest result was read/allocated before the type guard rejected it");
+  assert.equal(result.status, "incomplete");
+});
+
+test("REGRESSION: string/null/plain-object/array digest results are all refused", async () => {
+  for (const bad of ["deadbeef", null, {}, []]) {
+    const pi = recordingProductInfo();
+    const { deps } = baseDeps(pi.proxy, {
+      subtle: {
+        digest() {
+          return Promise.resolve(bad);
+        },
+      },
+    });
+    const { result } = await C.collect(deps);
+    assert.equal(result.identity.status, "hash-invalid", "digest " + JSON.stringify(bad) + " not refused");
+    assert.ok(!("digest" in result.identity));
+  }
+});
+
 test("REGRESSION: an invalid DUID (placeholder/overlong/control) is coded, not hashed", async () => {
   for (const [duid, code] of [
     ["Unknown", "duid-placeholder"],
