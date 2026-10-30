@@ -326,7 +326,7 @@ class Negatives(JoinBase):
         marker = "SEKRIT-PROPERTY"
         valid = json.dumps(product_info_dict())
         unknown_key = valid[:-1] + f', "{marker}": "x"}}'          # an unexpected top-level property
-        duplicate_key = '{"schema": "a", "schema": "b", "' + marker + '": "x"}'  # a duplicate key
+        duplicate_key = '{"' + marker + '": "a", "' + marker + '": "b"}'  # the secret itself is duplicated
         for label, raw in (("unknown", unknown_key), ("duplicate", duplicate_key)):
             with self.subTest(label=label):
                 try:
@@ -340,13 +340,15 @@ class Negatives(JoinBase):
 
     def test_strict_json_policy_refusal_never_leaks_a_user_controlled_key(self):
         marker = "SEKRIT-POLICY-KEY"
-        raw = '{"schema": "x", "schema": "y", "' + marker + '": "z"}'
-        try:
-            fj.join_policy_from_json(raw.encode("utf-8"))
-            self.fail("expected refusal")
-        except fj.JoinError as exc:
-            self.assertNotIn(marker, str(exc))
-            self.assertNotIn(marker, "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+        valid = fj._SYNTHETIC_POLICY_JSON.strip()
+        for raw in (valid[:-1] + ', "' + marker + '": "z"}',
+                    '{"' + marker + '": "a", "' + marker + '": "b"}'):
+            try:
+                fj.join_policy_from_json(raw.encode("utf-8"))
+                self.fail("expected refusal")
+            except fj.JoinError as exc:
+                self.assertNotIn(marker, str(exc))
+                self.assertNotIn(marker, "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
 
     def test_profile_mismatch_refused_by_match_device(self):
         wrong = copy.deepcopy(pv2.load("profile-v2.json"))
