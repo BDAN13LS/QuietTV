@@ -17,7 +17,9 @@ and no new identity semantics.
 The native side is decoded through the inspection tool's own v1 boundary; it is
 never re-implemented or weakened here. `model`/`firmware`/`region` are always
 `null` on the native side (the v1 validator forbids native guessing), so the
-join never reads them from there.
+join never reads them from there. A frame whose top-level `status` is not `ok`
+(a failed inventory) is refused conservatively: a failed run is not a successful
+join, and no readiness or action is ever inferred from it.
 
 ## Field sources (fixed, documented, no transforms)
 
@@ -49,9 +51,10 @@ a placeholder.
 
 The ProductInfo identity scheme `quiettv-device-facts-duid/sha256/1` is a
 different domain from the profile/capsule id `tvkit-device-id/1`. This module
-**never** writes the facts digest into a `deviceIdSha256` slot. When, and only
-when, a policy explicitly selects the facts scheme, the joined facts carry a
-scheme-tagged **opaque** token as their `deviceId`:
+**never** writes the facts digest into a `deviceIdSha256` slot. Every join
+requires the facts identity scheme and a valid on-device digest (there is no
+fingerprint-only / id-less mode), and the joined facts carry a scheme-tagged
+**opaque** token as their `deviceId`:
 
     deviceId = "quiettv-device-facts-duid/sha256/1:<on-device DUID digest>"
 
@@ -65,8 +68,18 @@ log line.
 
 `join(...)` returns an immutable, data-only `JoinReceipt` bound to the policy
 digest, the profile digest, **both** input SHA-256 digests and the identity
-scheme. `verify_receipt` re-derives its digest before any match, so a tampered
-receipt refuses before it can reach a matcher or a screen.
+scheme. The constructor deep-freezes its mappings (and coerces the preserved
+native release lines to a tuple), so a returned copy cannot mutate it.
+
+A receipt is **not** trusted on its own stored checksum. `verify_receipt`,
+`bind_to_recovery2` and `preflight_display` each **re-run the join** from the
+ORIGINAL observations, the trusted `JoinPolicy` and the profile you pass them,
+and refuse unless the freshly derived receipt — its input digests, its policy
+and profile digests, its identity scheme, its derived facts and token, and its
+own digest — equals the supplied one. A forged receipt whose own
+`receipt_digest` was recomputed over swapped facts therefore fails before any
+matcher or screen is reached. This is source/policy verification, not a
+signature or attestation; a trusted transport is still future work.
 
 ## Public API and parent invocation
 
@@ -80,17 +93,25 @@ policy  = fj.join_policy_from_json(your_trusted_policy) # your reviewed exact in
 receipt = fj.join(product_info_bytes, inspection_frame_bytes, policy=policy, profile=profile)
 facts   = receipt.device_facts()        # 8 profile/2 fields; deviceId is the opaque token
 
+# Re-derive and trust a receipt (re-runs the join from the original inputs):
+trusted = fj.verify_receipt(receipt, product_info_bytes, inspection_frame_bytes,
+                            policy=policy, profile=profile)
+
 # Exact match is the EXISTING matcher; factsjoin adds no permissive matcher:
 from tvkit.profile import match_device
 match_device(profile, facts)
 
-# Prove a recovery/2 capsule belongs to this exact TV, through the existing path:
+# Prove a recovery/2 capsule belongs to this exact TV, through the existing path.
+# The original observations + policy are required and re-derived before binding,
+# so a forged receipt cannot authorise a bind:
 result = fj.bind_to_recovery2(receipt, capsule_path, profile,
-                              external_policy=ext_policy, boot_policy=boot_policy)
+                              product_info=product_info_bytes, inspection_frame=inspection_frame_bytes,
+                              policy=policy, external_policy=ext_policy, boot_policy=boot_policy)
 assert result.device_bound
 
-# Optional offline preflight DISPLAY (enables nothing):
-screen = fj.preflight_display(receipt)   # fields + sources only; no capability, no action, no token
+# Optional offline preflight DISPLAY (enables nothing; re-derives first):
+screen = fj.preflight_display(receipt, product_info_bytes, inspection_frame_bytes,
+                              policy=policy, profile=profile)   # fields + sources only; no capability, no action, no token
 ```
 
 The parent exercises this against their saved private TV observations with the
