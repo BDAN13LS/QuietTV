@@ -80,7 +80,15 @@
     "tools/tv-capture/Program.cs",
     "tools/tv-capture/README.md",
     "docs/AI-SETUP-PROMPT.md",
-    "docs/ROADMAP.md"
+    "docs/ROADMAP.md",
+    "tools/tv-device-facts/collector.js",
+    "tools/tv-device-facts/index.html",
+    "tools/tv-device-facts/config.xml.template",
+    "tools/tv-device-facts/pack.py",
+    "tools/tv-device-facts/collector.test.js",
+    "tools/tv-device-facts/index.test.js",
+    "tools/tv-device-facts/test_pack.py",
+    "tools/tv-device-facts/README.md"
   ],
   "includeIfPresent": [
     "README.md",

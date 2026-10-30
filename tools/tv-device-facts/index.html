@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+  QuietTV device-facts probe UI. Minimal, offline, no network. It loads the collector, wires the
+  real Tizen/Samsung globals to it, shows a NON-SENSITIVE status summary on screen, retains the full
+  result only in the app's private wgt-private store for parent SDK retrieval, and auto-exits after a
+  short bounded delay. No console logging of raw values or the DUID.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1920,height=1080" />
+    <title>QuietTV Device Facts Probe</title>
+    <style>
+      body { background: #101014; color: #e8e8ea; font-family: sans-serif; margin: 48px; }
+      h1 { font-size: 28px; }
+      pre { font-size: 20px; line-height: 1.4; }
+    </style>
+    <!--
+      The Samsung Product/Web API loader. It MUST come before collector.js and the bootstrap, so
+      window.webapis.productinfo is defined when the probe runs. $WEBAPIS is resolved by the Tizen
+      runtime to the local on-device SDK path; this is NOT an external URL and opens no network.
+      Reference: https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references.html
+    -->
+    <script type="text/javascript" src="$WEBAPIS/webapis/webapis.js"></script>
+    <script src="collector.js"></script>
+  </head>
+  <body>
+    <h1>QuietTV device-facts probe</h1>
+    <pre id="summary">collecting...</pre>
+    <script>
+      (function () {
+        "use strict";
+
+        var EXIT_DELAY_MS = 8000; // bounded; retains the private result for SDK retrieval
+
+        function encodeUtf8(text) {
+          return new TextEncoder().encode(text);
+        }
+
+        // Writes the full result to the app's own private store only. Uses the Tizen filesystem
+        // callback API (not an event listener). The leaf name is taken from the collector's
+        // "wgt-private/<leaf>" path.
+        function writeFile(name, text) {
+          return new Promise(function (resolve, reject) {
+            var leaf = name.indexOf("/") >= 0 ? name.slice(name.indexOf("/") + 1) : name;
+            try {
+              tizen.filesystem.resolve(
+                "wgt-private",
+                function (dir) {
+                  var file;
+                  try {
+                    file = dir.resolve(leaf);
+                  } catch (e) {
+                    file = dir.createFile(leaf);
+                  }
+                  file.openStream(
+                    "w",
+                    function (stream) {
+                      try {
+                        stream.write(text);
+                        stream.close();
+                        resolve();
+                      } catch (werr) {
+                        // Always close the stream on a write failure, then report it.
+                        try {
+                          stream.close();
+                        } catch (closeErr) {
+                          // Nothing more to do; the original failure is what matters.
+                        }
+                        reject(werr);
+                      }
+                    },
+                    reject,
+                    "UTF-8"
+                  );
+                },
+                reject,
+                "rw"
+              );
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }
+
+        function showSummary(summary) {
+          // Statuses only; never raw values, never the digest.
+          var el = document.getElementById("summary");
+          if (el) {
+            el.textContent = JSON.stringify(summary, null, 2);
+          }
+        }
+
+        function scheduleExit() {
+          setTimeout(function () {
+            try {
+              tizen.application.getCurrentApplication().exit();
+            } catch (e) {
+              // Nothing to do; the probe simply stays until closed.
+            }
+          }, EXIT_DELAY_MS);
+        }
+
+        var webapisRef = typeof window !== "undefined" ? window.webapis : undefined;
+        var tizenRef = typeof window !== "undefined" ? window.tizen : undefined;
+        var productinfo = webapisRef && webapisRef.productinfo ? webapisRef.productinfo : null;
+
+        // Schedule the bounded auto-exit ONCE, BEFORE collection begins. This guarantees the probe
+        // leaves the foreground even if a filesystem or WebCrypto callback never resolves; the exit
+        // is not tied to collect() completing.
+        scheduleExit();
+
+        QuietTVDeviceFacts.collect({
+          productinfo: productinfo,
+          productInfoConfigKey: productinfo ? productinfo.ProductInfoConfigKey : null,
+          systeminfo: tizenRef ? tizenRef.systeminfo : null,
+          subtle: window.crypto && window.crypto.subtle ? window.crypto.subtle : null,
+          encodeUtf8: encodeUtf8,
+          writeFile: writeFile,
+          showSummary: showSummary,
+        }).then(null, function () {
+          var el = document.getElementById("summary");
+          if (el) {
+            el.textContent = "probe failed to record a result";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

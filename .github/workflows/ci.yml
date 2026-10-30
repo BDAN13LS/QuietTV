@@ -61,6 +61,10 @@ jobs:
           .venv/bin/python -m unittest discover -s tests -p 'test_helper*.py' -q
           node --test tests/test_helper_ui.mjs
           .venv/bin/python -m unittest discover -s tests -p 'test_tv_inspector.py' -q
+      - name: Device-facts probe checks (no device, synthetic fixtures only)
+        run: |
+          node --test tools/tv-device-facts/collector.test.js tools/tv-device-facts/index.test.js
+          .venv/bin/python -m unittest discover -s tools/tv-device-facts -p 'test_pack.py' -q
 
   native-host:
     name: Native host build

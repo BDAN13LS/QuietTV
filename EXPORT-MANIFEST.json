@@ -33,8 +33,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 5607,
-      "sha256": "4aced6da04efc29d921f00cc543bf741dd5a582ccb0f67cfcdedee61fbba9418"
+      "size": 5895,
+      "sha256": "e068d126f64b8299a3d303eda129f881a249e93a2306378478a0e4d7531ffc25"
     },
     {
       "path": ".gitignore",
@@ -83,8 +83,8 @@
     },
     {
       "path": "docs/ROADMAP.md",
-      "size": 2769,
-      "sha256": "52a683caf4b3dbcc9ef9f63c02c43f682b6bc388c749dd9b2d94a92365defd03"
+      "size": 2907,
+      "sha256": "3cb1d73041b199ce1fc1c07d99963a4169056803a071d3e622ff4ae93ba04090"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -743,8 +743,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 6421,
-      "sha256": "aab51c3ea4b95d04c65c92bc8238b960ab08f3ccf5dd61985282e45e8cea1690"
+      "size": 6768,
+      "sha256": "192b5a72133a7cf39bbf6cbfd38c38daa7943794599567fb606dc096fd87ca82"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -1100,6 +1100,46 @@
       "path": "tools/tv-capture/global.json",
       "size": 78,
       "sha256": "af6336f8bb598c240feafc0d77cb238310e78dda17b5a6dff3c11a9e232b665f"
+    },
+    {
+      "path": "tools/tv-device-facts/README.md",
+      "size": 12182,
+      "sha256": "1a40c9ac5df826ddc502b9802795cf2ddf6995fa0f9760cb1bd3da6201ceba18"
+    },
+    {
+      "path": "tools/tv-device-facts/collector.js",
+      "size": 12595,
+      "sha256": "5035d4995b4daf999fb6a3637551f04c775625447f571ae8dd960861b0008086"
+    },
+    {
+      "path": "tools/tv-device-facts/collector.test.js",
+      "size": 15094,
+      "sha256": "24f9c52ab2953e094939f77a932ee50be5f4f89eac44d927dcff14e1ca8e1b25"
+    },
+    {
+      "path": "tools/tv-device-facts/config.xml.template",
+      "size": 888,
+      "sha256": "689359c0b8ce8c960919bbe8a024600d85e1978c51d7d7ac4a00440b3b6737c1"
+    },
+    {
+      "path": "tools/tv-device-facts/index.html",
+      "size": 5061,
+      "sha256": "4c4b5d660f2c561bdf261a35c0ee606d81ac6833830b775d983a79045a80840f"
+    },
+    {
+      "path": "tools/tv-device-facts/index.test.js",
+      "size": 4313,
+      "sha256": "3342d9b5e50bf94e901e7ab8ae96aa872f0937b3e02cde2b7f8bac40dd0b57ea"
+    },
+    {
+      "path": "tools/tv-device-facts/pack.py",
+      "size": 6186,
+      "sha256": "75e1d696ee18e8b67757453e9144708a3a16d8a59f00025a4cbf07d51b27a61b"
+    },
+    {
+      "path": "tools/tv-device-facts/test_pack.py",
+      "size": 4059,
+      "sha256": "4219f81ff3be415653ac7aa99d4d77f49bbc989837352f3f3fafcccdbacc2285"
     },
     {
       "path": "tools/tv-inspect/.gitignore",
