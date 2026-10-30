@@ -163,7 +163,7 @@ the gap at the end).
 
 ### What it needs you to have
 
-The parent (not this tool) downloads and extracts the official release into your own storage,
+The operator (not this tool) downloads and extracts the official release into your own storage,
 **outside every QuietTV checkout**. This tool never downloads, extracts or installs a binary.
 You point it at:
 
@@ -188,7 +188,7 @@ You point it at:
 python -B helper/bootstrap.py verify  --cli-exe <EXE> [--cli-zip <ZIP>]
 python -B helper/bootstrap.py inspect --cli-exe <EXE> --data-dir <DIR>
 python -B helper/bootstrap.py prepare --cli-exe <EXE> --data-dir <DIR> --duid <RAW_DUID>
-          [--partner] [--allow-samsung-signin] [--trust-current-author]
+          [--partner] [--allow-samsung-signin] [--trust-current-author] [--assert-raw-duid]
 python -B helper/bootstrap.py acquire
 ```
 
@@ -204,7 +204,7 @@ python -B helper/bootstrap.py acquire
   - The `<RAW_DUID>` is the TV's **raw Tizen DUID** (`^[A-Za-z0-9]{10,64}$`, as upstream
     `tv`/`cert --tv` prints it). It is a **different identity domain** from QuietTV's hashed
     device-id token and from a network UUID; a value that looks like a 64-hex QuietTV hash is
-    refused to stop that exact confusion. The raw DUID is never stored in QuietTV state, never
+    requires `--assert-raw-duid` to confirm it is a genuine raw DUID. The raw DUID is never stored in QuietTV state, never
     echoed back, and never leaves this process except as the upstream argument.
   - **Author-identity pin.** The fingerprint is the SHA-256 of the author's **X.509 certificate
     in DER form** (read from `author.p12` with the pinned `cryptography` library), **not** a hash
@@ -221,8 +221,7 @@ python -B helper/bootstrap.py acquire
     DUID is already covered by a usable author, the reuse branch returns without minting: it still
     runs the local `cert --json` inspect to read the profile, but it never runs `cert --prepare` and
     never triggers a Samsung sign-in. If covering the DUID needs a Samsung sign-in (a new author, or
-    extending the
-    distributor to a new DUID), `prepare` **refuses** unless you pass `--allow-samsung-signin`.
+    extending the distributor to a new DUID), `prepare` **refuses** unless you pass `--allow-samsung-signin`.
     When it does proceed, it never runs `cert --prepare` against your real store: it stages into an
     owner-private candidate directory (`<DIR>\quiettv-bootstrap\candidates\<random>`, copying the
     existing profile for an extend so the author keypair is reused), runs the CLI there, and only
@@ -232,7 +231,9 @@ python -B helper/bootstrap.py acquire
     and the pin write (including its ACL) — has succeeded**; on **any** failure, at any point, the
     candidate is discarded, the original profile bytes are restored from the backup, and a freshly
     written pin is removed, so your existing `author.p12`/`distributor.p12`/`password.txt` and pin
-    state are left **byte-for-byte unchanged** and nothing is silently deleted. Any password or OTP
+    state are left **byte-for-byte unchanged**. If a filesystem error also prevents rollback, the
+    tool reports an incomplete rollback and retains the prior-profile backup for recovery; stop
+    before retrying. Any password or OTP
     is entered **only** in Samsung's own sign-in page the upstream opens — never collected by
     QuietTV. Prints a status-only result (`reused`, `coveredDuidCount`, `authorPinRecorded`); never
     the DUID or a path.
@@ -247,9 +248,9 @@ your PC** — the staged candidate, and, on success, the activated `author.p12`/
 `password.txt` and the author-cert pin under your `--data-dir`. Everything it writes is owner-only
 and inside your private data directory.
 
-### The acquisition gap (what the parent must close)
+### Remaining live-collection work
 
-The brief's fourth goal — a finite seam that captures the ProductInfo report and the native
+Automatic setup needs a finite connection that captures the ProductInfo report and the native
 inventory frame and feeds them to the existing Helper `--preflight-config` — **cannot be built
 on the stable CLI as pinned.** `apps2samsung-cli v3.1.0` exposes exactly these verbs: `scan`,
 `tv`, `catalog`, `installed`, `install`, `uninstall`, `launch`, `cert`, `tvstore`. There is **no
@@ -264,7 +265,7 @@ TV-connecting verbs to clear any competing SDB server (`ClearCompetingSdbServer 
 ProcessHelper.KillSdbServers`), so a connecting verb can kill an unrelated Tizen SDK's `sdb` server
 on the same machine. The local, no-`--tv` `cert` path this slice uses never triggers that; a future
 acquisition seam must account for it. `bootstrap.py acquire` states all of this as data — the exact
-missing operation and the SDB-kill constraint — for the parent to act on.
+missing operation and the SDB-kill constraint — for future integration work.
 
 ## Tests
 

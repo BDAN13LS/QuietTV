@@ -638,24 +638,26 @@ def _activate(candidate_profile_dir: Path, real_profile_dir: Path) -> Path | Non
     return backup
 
 
-def _restore_profile(real_profile_dir: Path, backup: Path | None) -> None:
+def _restore_profile(real_profile_dir: Path, backup: Path | None) -> bool:
     """Undo an activation: discard whatever was activated and move the backup back, if any."""
     try:
         shutil.rmtree(real_profile_dir, ignore_errors=True)
         if backup is not None:
             os.rename(backup, real_profile_dir)
+        return True
     except OSError:
-        pass
+        return False  # keep the prior-profile backup for owner recovery
 
 
-def _remove_pin_quietly(data_dir: Path, level: str) -> None:
+def _remove_pin_quietly(data_dir: Path, level: str) -> bool:
     """Best-effort removal of a freshly written pin during rollback (there was none before)."""
     try:
         path = _pin_path(data_dir, level)
         if path.exists():
             path.unlink()
+        return True
     except OSError:
-        pass
+        return False
 
 
 def prepare_certificate(dep: DependencyContract, data_dir: Path, *, duid: str, level: str = "Public",
@@ -761,9 +763,11 @@ def prepare_certificate(dep: DependencyContract, data_dir: Path, *, duid: str, l
                 if backup is not None:
                     shutil.rmtree(backup, ignore_errors=True)
             else:
-                if pinned is None:
-                    _remove_pin_quietly(data_dir, level)
-                _restore_profile(real_profile_dir, backup)
+                pin_restored = pinned is not None or _remove_pin_quietly(data_dir, level)
+                profile_restored = _restore_profile(real_profile_dir, backup)
+                if not pin_restored or not profile_restored:
+                    _fail("certificate rollback is incomplete; stop and recover the retained prior "
+                          "profile backup before retrying")
     except BootstrapError:
         raise
     except OSError:

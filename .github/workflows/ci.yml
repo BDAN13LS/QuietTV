@@ -38,6 +38,7 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/python -m pip install -e "./${PKG}[test]"
+          .venv/bin/python -m pip install -r helper/requirements-bootstrap.txt
       - name: Unit, fake-TV and stdio MCP tests (no device, no network to any TV)
         run: .venv/bin/python -m pytest "${PKG}/tests" -q
       - name: Backup, restore-plan and export tests (offline fixtures only)

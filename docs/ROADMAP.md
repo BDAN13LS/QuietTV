@@ -16,6 +16,7 @@ The verified profile remains Samsung UN43U8000FBXZA / firmware 1300.8 / Tizen 9 
 - [x] Official Samsung firmware/model/country probe verified on the reference TV, with hashed identity output.
 - [x] Offline joining of saved ProductInfo and native reports into exact profile and recovery matching, with forged-receipt refusals.
 - [x] Optional Helper display of matched saved reports, with source labels, stale-result invalidation and all TV-changing actions still blocked.
+- [x] Windows certificate bootstrap over pinned Apps2Samsung CLI, with existing-owner profile reuse verified; fresh Samsung sign-in remains unverified.
 - [x] AI setup prompt and client configuration guides; Codex and Opus 4.8 have assisted project work.
 
 These checks do not establish a full stock-TV installation or a complete live restore.
@@ -26,6 +27,7 @@ These checks do not establish a full stock-TV installation or a complete live re
 - [ ] Publish the compatible privileged connection and per-owner setup components.
 - [ ] Complete restore support for the loader references used by Tizen packages.
 - [ ] Verify full off-TV backup restoration and independent Rescue on hardware.
+- [ ] Connect live report collection to Helper preflight without disturbing other SDK connections.
 - [ ] Finish the Windows Helper, per-owner signing and guided installation.
 - [ ] Add reviewed component selection and individual/full restore controls.
 - [ ] Enable consumer installation and cleanup only after backup/recovery gates pass.

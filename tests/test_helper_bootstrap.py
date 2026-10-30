@@ -439,6 +439,30 @@ class PrepareTests(BaseTest):
         prof = dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME["Public"]
         self.assertFalse(list(prof.parent.glob("*.bak-*")))      # no backup leaked
 
+    def test_failed_rollback_is_reported_and_prior_backup_retained(self):
+        from unittest.mock import patch
+        dd = self.data_dir()
+        self.seed_author(dd, "Public", "A", "pw")
+        before = self.profile_bytes(dd)
+        prof = dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME["Public"]
+        spec = self.write_spec(
+            inspect=inspect_doc(profile("Public", duids=[DUID2]),
+                                profile("Partner", exists=False, usable=False)),
+            prepare=prepare_doc("Public", [DUID1, DUID2]),
+            writeAuthorP12={"Public": {"src": self.p12_src("A", "newpw"), "password": "newpw"}})
+        rename = bs.os.rename
+        def fail_restoration(src, dst):
+            if ".bak-" in Path(src).name:
+                raise OSError("synthetic restore failure")
+            return rename(src, dst)
+        with patch.object(bs, "_write_pin", side_effect=OSError("synthetic pin failure")), \
+             patch.object(bs.os, "rename", side_effect=fail_restoration):
+            with self.assertRaisesRegex(bs.BootstrapError, "rollback is incomplete"):
+                bs.prepare_certificate(self.dep(spec), dd, duid=DUID1, allow_sign_in=True)
+        backups = list(prof.parent.glob("*.bak-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual({n: (backups[0] / n).read_bytes() for n in before}, before)
+
     def test_damaged_password_utf8_is_finite_error(self):
         dd = self.data_dir()
         self.seed_author(dd, "Public", "A", "pw")
