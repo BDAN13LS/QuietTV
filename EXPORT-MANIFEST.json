@@ -83,8 +83,8 @@
     },
     {
       "path": "docs/ROADMAP.md",
-      "size": 2907,
-      "sha256": "3cb1d73041b199ce1fc1c07d99963a4169056803a071d3e622ff4ae93ba04090"
+      "size": 3105,
+      "sha256": "7d8bee6ef25e37f9f2d544eb4654478e9dfb320328e57c00f76c8844ad654276"
     },
     {
       "path": "docs/drafts/README-consumer.md",
@@ -727,6 +727,11 @@
       "sha256": "e9555f2adae2be5570b3eb4d1ee422f318b2429252b46fcd7ef6fb5406fdd808"
     },
     {
+      "path": "public-toolkit/docs/FACTS-JOIN.md",
+      "size": 8290,
+      "sha256": "a3904ef7efd6b12cefa75d3580093d5ed0804b916e8c48225c7faacb133a787d"
+    },
+    {
       "path": "public-toolkit/docs/RECOVERY2.md",
       "size": 11046,
       "sha256": "2f2c291c20ed3619a3d5757b9ce633da8dfa90331f54e4bb07af3fde0f06582f"
@@ -805,6 +810,11 @@
       "path": "public-toolkit/tvkit/export.py",
       "size": 23983,
       "sha256": "f15371d73ccce7c35daa72cbd1e011b10b9eb69891d4abebee34ed111e6d8287"
+    },
+    {
+      "path": "public-toolkit/tvkit/factsjoin.py",
+      "size": 35506,
+      "sha256": "b5bc830359c0714625d438aee4b3e06a55d86274b005285cb4a4dd3c04a75fd4"
     },
     {
       "path": "public-toolkit/tvkit/fetch.py",
@@ -985,6 +995,11 @@
       "path": "tests/test_public_toolkit_export.py",
       "size": 18016,
       "sha256": "6c7020ca86180af1c16e7664c247654577780c78c4c989b61499c5e0ed70bebb"
+    },
+    {
+      "path": "tests/test_public_toolkit_factsjoin.py",
+      "size": 20360,
+      "sha256": "bf53d863c8456f93e571f0ceafdde88a7614894b16653908ce274e522389946e"
     },
     {
       "path": "tests/test_public_toolkit_fetch.py",
