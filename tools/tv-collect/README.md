@@ -166,3 +166,23 @@ use `/home/owner/share/tmp/sdk_tools/quiettv-collect-<run-id>`. The trusted adap
 create an accessible directory only inside that fresh namespace, verify uploaded hashes,
 and remove the directory after cleanup. A transfer/readback/removal probe passed there;
 this does not establish compatibility on another model or firmware.
+
+## Reference-TV verification
+
+A warm run on the reference Samsung UN43U8000FBXZA / firmware 1300.8 / Tizen 9 / ARMv7
+used a temporary maintainer-controlled SDK/root provider. The public collector installed
+and launched its diagnostic widget, captured its fresh ProductInfo report, staged and ran
+the pinned native inspector, matched the seven profile facts, and reconciled its temporary
+package and uploads. The same boot, root and launcher processes remained, and four protected
+runtime/recovery files matched their original hashes. The dashboard foreground was reported
+again after Home. No reboot was required.
+
+The running Helper then loaded the exact generated `helper-preflight-config.json` through
+its normal CLI and authenticated HTTP interface. It displayed the seven matching facts,
+kept every change action unavailable and exposed no identity, token or source path in HTTP.
+These are fresh observations supplied as saved files to the Helper; the Helper has no new
+live-collection HTTP route. A public privileged provider and hardware restore remain pending.
+
+The native inventory is a snapshot taken while the diagnostic widget is installed. Future
+app-selection consumers must exclude that diagnostic package or obtain a post-cleanup
+inventory; this slice uses the snapshot for runtime/profile facts only.

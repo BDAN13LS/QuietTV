@@ -43,6 +43,10 @@ are planned. See the
 [install options](docs/INSTALL-OPTIONS.md) and
 [consumer install design](docs/CONSUMER-INSTALL-DESIGN-2026-10-27.md).
 
+Advanced developer tooling can now [collect fresh device reports](tools/tv-collect/README.md)
+through a trusted provider and produce inputs for the Helper. A temporary maintainer
+provider was verified on the reference TV; the public privileged provider is still pending.
+
 On the reference TV, Home, the remote, native app launch, Settings, the input picker,
 Store opening and unattended root recovery were tested.
 

@@ -94,7 +94,11 @@
     "tools/tv-device-facts/collector.test.js",
     "tools/tv-device-facts/index.test.js",
     "tools/tv-device-facts/test_pack.py",
-    "tools/tv-device-facts/README.md"
+    "tools/tv-device-facts/README.md",
+    "tools/tv-collect/collect.py",
+    "tools/tv-collect/README.md",
+    "tests/test_helper_live_collect.py",
+    "docs/superpowers/plans/2026-10-30-live-report-collection.md"
   ],
   "includeIfPresent": [
     "README.md",
