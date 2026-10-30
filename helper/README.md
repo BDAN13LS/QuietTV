@@ -167,11 +167,15 @@ The parent (not this tool) downloads and extracts the official release into your
 **outside every QuietTV checkout**. This tool never downloads, extracts or installs a binary.
 You point it at:
 
-- `--cli-exe <OWNER_STORAGE>\apps2samsung-cli.exe` — the extracted CLI, in your storage.
+- `--cli-exe <OWNER_STORAGE>\apps2samsung-cli.exe` — the extracted CLI, in your storage. Its
+  bytes are **always** verified — pinned size (79,738,754) and SHA-256
+  (`29b64e7791b83ebfe95d1ff3f697e0bc4f856f070ad0fbf27e433e4cdfb58a55`) — **before the binary is
+  ever run**, and the launcher is derived from that verified exe. A binary is **never** accepted
+  on filename or `--version` alone: the byte pin is the gate, `--version` (`3.1.0`) is only a
+  secondary confirmation that runs after the bytes match.
 - `--cli-zip <OWNER_STORAGE>\Apps2Samsung-cli-v3.1.0-win-x64.zip` — *optional*; when given, its
   bytes are verified against the pinned size (34,492,438) and SHA-256
-  (`02e9228c81f6b519879036a7041b40233ddca0e908a46952ebbcd1e1ed8e5a42`). A binary is **never**
-  accepted on filename or version alone: `--version` must also report `3.1.0`.
+  (`02e9228c81f6b519879036a7041b40233ddca0e908a46952ebbcd1e1ed8e5a42`) first.
 - `--data-dir <OWNER_STORAGE>\quiettv-a2s` — a **private per-owner** data directory, created
   owner-only, **outside every git checkout**. The CLI's shared default (`%APPDATA%\Apps2Samsung`)
   is never used: this tool always passes `--data-dir` and sets `APPS2SAMSUNG_DATA_DIR`, and it
@@ -201,25 +205,41 @@ python -B helper/bootstrap.py acquire
     device-id token and from a network UUID; a value that looks like a 64-hex QuietTV hash is
     refused to stop that exact confusion. The raw DUID is never stored in QuietTV state, never
     echoed back, and never leaves this process except as the upstream argument.
-  - **Author-identity pin.** The SHA-256 of the on-disk `author.p12` container is the author
-    fingerprint. It is pinned once, owner-private, at `<DIR>\quiettv-bootstrap\author-pin-<level>.json`
-    (the hash only — never the key, the password or any path). On every later run the on-disk
-    author must still match the pin, and the author container must be **unchanged** across the
-    run; any mismatch is **refused** with no further action. A first-seen author is adopted only
-    with `--trust-current-author`.
-  - **Default is reuse-only.** If the DUID is already covered by a usable author, the upstream
-    reuses it silently (no sign-in) and this succeeds. If covering the DUID would need a Samsung
-    sign-in (a new author, or extending the distributor to a new DUID), `prepare` **refuses**
-    unless you pass `--allow-samsung-signin`. Even then, any password or OTP is entered **only**
-    in Samsung's own sign-in page that the upstream opens — never collected by QuietTV. Prints a
-    status-only result (`reused`, `coveredDuidCount`, `authorPinRecorded`); never the DUID or a
-    path.
+  - **Author-identity pin.** The fingerprint is the SHA-256 of the author's **X.509 certificate
+    in DER form** (read from `author.p12` with the pinned `cryptography` library), **not** a hash
+    of the `.p12` container bytes. This is deliberate: Samsung re-encrypts the same author keypair
+    with a new container on a distributor-only regen, so the container hash changes while the
+    identity does not — the DER fingerprint is stable across re-encryption and still changes if the
+    author is actually replaced. It is pinned once, owner-private, at
+    `<DIR>\quiettv-bootstrap\author-cert-<level>.json` (schema `quiettv-bootstrap-author-cert/1`,
+    the fingerprint only — never the key, the password or any path). On every later run the on-disk
+    author must still parse to a certificate and match the pin; a pin with no readable author on
+    disk, an unreadable or malformed author, or a mismatch is **refused** with no CLI run. A
+    first-seen (unpinned) author is adopted only with `--trust-current-author`.
+  - **Default is reuse-only, and mint/extend is staged before it ever touches your store.** If the
+    DUID is already covered by a usable author, the reuse branch returns **without calling the CLI
+    at all**. If covering the DUID needs a Samsung sign-in (a new author, or extending the
+    distributor to a new DUID), `prepare` **refuses** unless you pass `--allow-samsung-signin`.
+    When it does proceed, it never runs `cert --prepare` against your real store: it stages into an
+    owner-private candidate directory (`<DIR>\quiettv-bootstrap\candidates\<random>`, copying the
+    existing profile for an extend so the author keypair is reused), runs the CLI there, and only
+    after the candidate covers the **requested** DUID exactly and its author fingerprint is
+    unchanged/matches the pin does it atomically activate the candidate over the real profile (with
+    backup-and-restore). On **any** failure the candidate is discarded and your existing
+    `author.p12`/`distributor.p12`/`password.txt` are left **byte-for-byte unchanged**. Any password
+    or OTP is entered **only** in Samsung's own sign-in page the upstream opens — never collected by
+    QuietTV. Prints a status-only result (`reused`, `coveredDuidCount`, `authorPinRecorded`); never
+    the DUID or a path.
 - **`acquire`** — prints the **honest refused acquisition state** (see the gap below). It reads
   nothing and runs no binary.
 
-This slice installs nothing and makes **no device writes at all**: it is read-only with respect
-to the TV. No diagnostic widget is staged, signed, installed, launched or removed here; that
-remains future, owner-invoked, and out of this slice.
+This slice makes **no TV writes**: it is read-only with respect to the TV, and no diagnostic
+widget is staged, signed, installed, launched or removed here (that remains future, owner-invoked,
+and out of this slice). "No TV writes" is **not** "no writes at all": an explicit owner-invoked
+`prepare` that proceeds past the sign-in opt-in **does write owner-private certificate material on
+your PC** — the staged candidate, and, on success, the activated `author.p12`/`distributor.p12`/
+`password.txt` and the author-cert pin under your `--data-dir`. Everything it writes is owner-only
+and inside your private data directory.
 
 ### The acquisition gap (what the parent must close)
 
@@ -233,8 +253,12 @@ not our native frame. So the stable CLI can neither read our diagnostic widget's
 result nor run our fixed read-only native collector. Until an upstream (or QuietTV-side) pinned
 `pull`/`shell`/`capture` JSON operation exists, acquisition stays **refused**, and the manual
 saved-report path (`--preflight-config`, above) remains the only way to feed `tvkit.factsjoin`.
-`bootstrap.py acquire` states this as data, with the exact missing operation, for the parent to
-act on.
+There is a second reason to keep this refused rather than improvised: the upstream wires its
+TV-connecting verbs to clear any competing SDB server (`ClearCompetingSdbServer =
+ProcessHelper.KillSdbServers`), so a connecting verb can kill an unrelated Tizen SDK's `sdb` server
+on the same machine. The local, no-`--tv` `cert` path this slice uses never triggers that; a future
+acquisition seam must account for it. `bootstrap.py acquire` states all of this as data — the exact
+missing operation and the SDB-kill constraint — for the parent to act on.
 
 ## Tests
 
@@ -243,15 +267,26 @@ python -B -m unittest tests.test_helper_session tests.test_helper_server tests.t
 node --test tests/test_helper_ui.mjs
 ```
 
-`tests/test_helper_bootstrap.py` drives the real command builder, process runner and strict JSON
-parser against an **isolated executable fixture** (a Python script that prints the recorded
-`v3.1.0` JSON shapes and, for `prepare`, writes a synthetic `author.p12`) — never a mocked
-all-success return. It covers the positive `verify`/`inspect`/`prepare` paths and the refusals:
-wrong version, wrong zip digest/size, a DUID that looks like a QuietTV hash, a symlink/reparse or
-`..`/UNC path, a data-dir inside a git checkout, an author-pin mismatch, a prepare that would need
-a sign-in without the opt-in, a non-zero exit, malformed/oversize JSON, a child timeout with
-cleanup, and that no DUID, path or child output is ever echoed on error. Every device-fact value
-in the fixtures is synthetic; no test contacts a real TV or runs the real binary.
+`tests/test_helper_bootstrap.py` drives the real command builder, process runner, strict JSON
+parser and PKCS#12 fingerprinter against **isolated executable fixtures** (`a2s_cli_fixture.py`
+prints the recorded `v3.1.0` JSON shapes and, for `prepare`, copies a real synthetic `author.p12`
+the test generated offline with the pinned `cryptography`; `runner_tree_fixture.py` spawns a
+grandchild and floods stdout) — never a mocked all-success return. It covers the positive
+`verify`/`inspect`/`prepare` (reuse, first-mint, extend) paths and the refusals: an exe whose bytes
+do not match the pin (and that the binary is **never run** until the bytes match — a correct archive
+with a wrong exe still never runs), wrong version, wrong zip digest/size, a DUID that looks like a
+QuietTV hash (and that a genuine 64-hex raw DUID is accepted only with the explicit assertion), a
+symlink/reparse/junction or `..` path, a data-dir inside a git checkout, duplicate JSON keys, a
+string where a boolean is required, a non-ISO date string, a prepare covering a different TV than
+requested, an author identity that changes during prepare (with the original profile left
+byte-unchanged), an author-pin mismatch (with no CLI run), a missing pinned author, an unpinned
+author without `--trust-current-author`, a prepare that would need a sign-in without the opt-in, a
+malformed author in the store, a non-zero exit, a child timeout, a stdout/stderr byte-cap overflow
+that stops a still-running producer **before** its completion marker and reaps the orphaned
+grandchild, child-environment containment, and that no DUID, path or child output is ever echoed on
+error. The fingerprint tests prove the same certificate under two encryptions yields one
+fingerprint, a different certificate a different one, and malformed bytes none. Every device-fact
+value in the fixtures is synthetic; no test contacts a real TV or runs the real binary.
 
 `tests/test_helper_preflight.py` exercises the saved-report preflight end to end through the
 real loopback server with synthetic report, frame, policy and profile files (no core loader,

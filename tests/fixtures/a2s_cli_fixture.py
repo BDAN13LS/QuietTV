@@ -44,12 +44,18 @@ def main() -> int:
         is_prepare = "--prepare" in args
         level = "Partner" if "--partner" in args else "Public"
         if is_prepare:
+            data_dir = os.environ.get("APPS2SAMSUNG_DATA_DIR", ".")
+            prof_dir = Path(data_dir) / "Certificate" / PROFILE_DIR_NAME[level]
             write = spec.get("writeAuthor", {})
-            if level in write:
-                data_dir = os.environ.get("APPS2SAMSUNG_DATA_DIR", ".")
-                dest = Path(data_dir) / "Certificate" / PROFILE_DIR_NAME[level] / "author.p12"
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_bytes(write[level].encode("utf-8"))
+            if level in write:  # raw bytes: used to prove malformed bytes are not a certificate
+                prof_dir.mkdir(parents=True, exist_ok=True)
+                (prof_dir / "author.p12").write_bytes(write[level].encode("utf-8"))
+            p12 = spec.get("writeAuthorP12", {})
+            if level in p12:  # a real synthetic PKCS#12 the test generated offline, plus its password
+                prof_dir.mkdir(parents=True, exist_ok=True)
+                (prof_dir / "author.p12").write_bytes(Path(p12[level]["src"]).read_bytes())
+                (prof_dir / "distributor.p12").write_bytes(b"synthetic-distributor")
+                (prof_dir / "password.txt").write_text(p12[level]["password"], "utf-8")
             if "prepareStdout" in spec:
                 sys.stdout.write(spec["prepareStdout"])
                 return int(spec.get("prepareExit", 0))
