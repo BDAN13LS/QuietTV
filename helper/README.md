@@ -66,10 +66,10 @@ operator's explicit trust and pairing assertions:
 ```json
 {
   "schema": "quiettv-helper-preflight/1",
-  "productInfoReport": "C:\\owner\\tv\\productinfo.json",
-  "nativeInspectionFrame": "C:\\owner\\tv\\inspection.frame",
-  "joinPolicy": "C:\\owner\\tv\\policy.json",
-  "profile": "C:\\owner\\tv\\profile2.json",
+  "productInfoReport": "<OWNER_STORAGE>\\productinfo.json",
+  "nativeInspectionFrame": "<OWNER_STORAGE>\\inspection.frame",
+  "joinPolicy": "<OWNER_STORAGE>\\policy.json",
+  "profile": "<OWNER_STORAGE>\\profile2.json",
   "operatorAssertions": {
     "trustPolicyAndProfile": true,
     "pairedFromSameTv": true

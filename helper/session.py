@@ -831,13 +831,14 @@ class Session:
             policy = fj.join_policy_from_json(policy_raw)
             receipt = fj.join(report, frame, policy=policy, profile=profile)
             shown = fj.preflight_display(receipt, report, frame, policy=policy, profile=profile)
+            # The projection is inside the try too: a KeyError here must not escape to the server.
+            return self._preflight_success(config, shown)
         except (fj.JoinError, tvprofile.ProfileError, sj.StrictJsonError):
             return self._preflight_error("verify-failed")
         except Exception:
-            # Any other failure (a hostile frame, RecursionError, a bad profile object) is still a
-            # refusal, never an escaped exception: do_POST would otherwise send no response.
+            # Any other failure (a hostile or truncated frame, RecursionError, a bad profile object)
+            # is still a refusal, never an escaped exception: do_POST would otherwise send no response.
             return self._preflight_error("verify-failed")
-        return self._preflight_success(config, shown)
 
     @staticmethod
     def _preflight_error(code: str) -> dict:

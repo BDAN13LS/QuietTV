@@ -69,8 +69,11 @@ def write_config(tmp, paths, *, assertions=None, drop=None, extra=None, same=Non
     return str(path)
 
 
-def write_sources(tmp, *, report_obj=None, frame=None, profile=None):
-    report = json.dumps(report_obj if report_obj is not None else product_info_dict()).encode("utf-8")
+def write_sources(tmp, *, report_obj=None, report_raw=None, frame=None, profile=None):
+    if report_raw is not None:
+        report = report_raw
+    else:
+        report = json.dumps(report_obj if report_obj is not None else product_info_dict()).encode("utf-8")
     frame_bytes = frame if frame is not None else _encode(native_doc())
     profile_bytes = profile if profile is not None else PROFILE_FIXTURE.read_bytes()
     paths = {}
@@ -214,10 +217,19 @@ class PreflightServerCase(ServerCase):
         self._redirect = contextlib.redirect_stderr(self.stderr)
         self._redirect.__enter__()
 
-    def tearDown(self):
+    def _assert_no_leak(self):
+        # ServerCase.call records every response body into self.bodies, so this sees the real HTTP
+        # bytes, not a re-serialisation. The positive-control test below proves this fires on a leak.
         leak = "\n".join(self.bodies) + self.stderr.getvalue()
-        for secret in (DUID_DIGEST, IDENTITY_TOKEN, str(self.tmpdir), *self.src_paths.values()):
-            self.assertNotIn(secret, leak)  # no digest, token or source path in HTTP or stdio
+        secrets_plain = [DUID_DIGEST, IDENTITY_TOKEN, str(self.tmpdir), *self.src_paths.values()]
+        # JSON responses escape every backslash, so a leaked Windows path appears as C:\\... in the
+        # body. Check both the plain path and its JSON-escaped form, or the body half is blind.
+        for secret in secrets_plain:
+            self.assertNotIn(secret, leak)
+            self.assertNotIn(json.dumps(secret)[1:-1], leak)  # JSON-escaped form (backslashes doubled)
+
+    def tearDown(self):
+        self._assert_no_leak()
         super().tearDown()
 
     def preflight(self, **kw):
@@ -310,6 +322,28 @@ class DriftPreflightTests(PreflightServerCase):
         self.assertNotIn(self.MARKER, json.dumps(st))  # the drifted value never leaks
 
 
+class FirmwareDriftPreflightTests(PreflightServerCase):
+    def source_overrides(self):
+        obj = product_info_dict()
+        obj["fields"]["firmware"]["value"] = "SYNTHETIC-BUILD-9999.9"  # firmware drift -> policy gate refuses
+        return {"report_obj": obj}
+
+    def test_firmware_drift_is_verify_failed(self):
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+
+
+class ProfileMismatchPreflightTests(PreflightServerCase):
+    def source_overrides(self):
+        prof = json.loads(PROFILE_FIXTURE.read_text("utf-8"))
+        prof["match"]["region"] = "SYNTHETIC-DIFFERENT"  # same profile id, different match -> ProfileError branch
+        return {"profile": json.dumps(prof).encode("utf-8")}
+
+    def test_profile_mismatch_is_verify_failed(self):
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+
+
 class FailedNativePreflightTests(PreflightServerCase):
     def source_overrides(self):
         return {"frame": failed_frame()}
@@ -319,6 +353,82 @@ class FailedNativePreflightTests(PreflightServerCase):
         self.assertEqual(status, 200)
         self.assertEqual(st["preflight"]["status"], "error")
         self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+
+
+class MissingNativeRuntimePreflightTests(PreflightServerCase):
+    def source_overrides(self):
+        return {"frame": _encode({**native_doc(), "observedRuntime": None})}
+
+    def test_missing_native_runtime_is_verify_failed(self):
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+
+
+class TruncatedFramePreflightTests(PreflightServerCase):
+    def source_overrides(self):
+        full = _encode(native_doc())
+        return {"frame": full[: len(full) // 2]}  # truncated frame exercises the catch-all
+
+    def test_truncated_frame_is_verify_failed(self):
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+
+
+class TruncatedReportPreflightTests(PreflightServerCase):
+    def source_overrides(self):
+        full = json.dumps(product_info_dict()).encode("utf-8")
+        return {"report_raw": full[: len(full) // 2]}  # report cut mid-JSON
+
+    def test_truncated_report_is_verify_failed(self):
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+
+
+class MalformedProfileSecretKeyPreflightTests(PreflightServerCase):
+    MARKER = "SEKRIT-PROFILE-KEY"
+
+    def source_overrides(self):
+        # The profile is the one source the Helper parses itself (not factsjoin): prove our own
+        # strict-JSON boundary refuses a duplicate key and never echoes the key name.
+        raw = ('{"' + self.MARKER + '": 1, "' + self.MARKER + '": 2}').encode("utf-8")
+        return {"profile": raw}
+
+    def test_malformed_profile_is_verify_failed_without_echo(self):
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "verify-failed")
+        self.assertNotIn(self.MARKER, json.dumps(st))
+
+
+class MissingAtRuntimePreflightTests(PreflightServerCase):
+    def test_source_deleted_after_startup_is_source_unreadable(self):
+        os.unlink(self.src_paths["report"])  # present at startup, gone before the POST
+        _, st = self.preflight()
+        self.assertEqual(st["preflight"]["error"]["code"], "source-unreadable")
+
+
+class LeakDetectorPositiveControlTests(PreflightServerCase):
+    """Positive controls: prove _assert_no_leak actually fires on a real leak, for each half."""
+
+    def source_overrides(self):
+        obj = product_info_dict()
+        obj["fields"]["realModel"]["value"] = "DRIFTED"  # force the verify-failed path so the patched
+        return {"report_obj": obj}                        # error message (with a leaked path) is returned
+
+    def tearDown(self):
+        ServerCase.tearDown(self)  # skip _assert_no_leak; these tests deliberately inject a path
+
+    def test_detector_catches_a_path_leaked_into_the_http_body(self):
+        injected = self.src_paths["report"]
+        with mock.patch.dict(hs.PREFLIGHT_ERRORS, {"verify-failed": "leaked: " + injected}):
+            self.preflight()
+        self.assertTrue(self.bodies)  # call() really recorded the response body
+        with self.assertRaises(AssertionError):
+            self._assert_no_leak()    # the detector sees the leaked path (as its JSON-escaped form)
+
+    def test_detector_catches_a_path_leaked_into_stderr(self):
+        print("leaked: " + self.src_paths["report"], file=sys.stderr)  # redirected into self.stderr
+        with self.assertRaises(AssertionError):
+            self._assert_no_leak()
 
 
 class OversizeSourcePreflightTests(PreflightServerCase):
@@ -398,26 +508,43 @@ class MainStartupTests(unittest.TestCase):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
 
+    def _run_main(self, config_path):
+        import contextlib
+        out, err, served = io.StringIO(), io.StringIO(), []
+        with mock.patch.object(srv, "HelperApp") as app_ctor, \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = srv.main(["--no-browser", "--preflight-config", config_path], browser_open=None,
+                          serve=served.append)
+        return rc, out.getvalue(), err.getvalue(), served, app_ctor
+
     def test_main_refuses_a_bad_preflight_config_without_binding(self):
         bad = Path(self.tmp) / "bad.json"
         bad.write_text("{ not json", encoding="utf-8")
-        err = io.StringIO()
-        import contextlib
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
-            rc = srv.main(["--no-browser", "--preflight-config", str(bad)], browser_open=None,
-                          serve=lambda app: None)
-        self.assertEqual(rc, 2)
-        self.assertIn("preflight config refused", err.getvalue())
+        unc = write_config(self.tmp, write_sources(self.tmp), extra={"productInfoReport": r"\\host\share\r.json"})
+        # Each case: refused, the server never built (so nothing binds), no source path in stdio.
+        for label, path, leak in (("malformed", str(bad), str(bad)),
+                                   ("unc-source", unc, r"\\host\share\r.json")):
+            with self.subTest(case=label):
+                rc, out, err, served, app_ctor = self._run_main(path)
+                self.assertEqual(rc, 2)
+                app_ctor.assert_not_called()  # the server is never built, so nothing binds
+                self.assertEqual(served, [])
+                self.assertIn("preflight config refused", err)
+                self.assertNotIn(leak, out + err)  # the refusal names no path, on either stream
 
     def test_main_accepts_a_valid_preflight_config(self):
-        cfg_path = write_config(self.tmp, write_sources(self.tmp))
+        srcs = write_sources(self.tmp)
+        cfg_path = write_config(self.tmp, srcs)
         seen = {}
         import contextlib
-        with contextlib.redirect_stdout(io.StringIO()):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
             rc = srv.main(["--no-browser", "--preflight-config", cfg_path], browser_open=None,
                           serve=lambda app: seen.update(configured=app.session.state()["preflight"]["configured"]))
         self.assertEqual(rc, 0)
         self.assertTrue(seen["configured"])
+        for src in srcs.values():  # a normal startup prints no source path to stdout either
+            self.assertNotIn(src, out.getvalue())
 
 
 if __name__ == "__main__":
