@@ -14,6 +14,7 @@ The verified profile remains Samsung UN43U8000FBXZA / firmware 1300.8 / Tizen 9 
 - [x] Real package archive and security-metadata capture with TV/PC digest checks.
 - [x] PC capsule assembly that streams archive bytes, with integrity and memory regression tests.
 - [x] Official Samsung firmware/model/country probe verified on the reference TV, with hashed identity output.
+- [x] Offline joining of saved ProductInfo and native reports into exact profile and recovery matching, with forged-receipt refusals.
 - [x] AI setup prompt and client configuration guides; Codex and Opus 4.8 have assisted project work.
 
 These checks do not establish a full stock-TV installation or a complete live restore.
@@ -45,5 +46,6 @@ These checks do not establish a full stock-TV installation or a complete live re
 Pick a focused unchecked item and open a pull request with tests and appropriate
 hardware evidence. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 Existing implementation notes are in the [installation plan](CONSUMER-INSTALL-DESIGN-2026-10-27.md),
-[capture documentation](../public-toolkit/docs/D2-CAPTURE.md) and
+[capture documentation](../public-toolkit/docs/D2-CAPTURE.md),
+[device-facts join](../public-toolkit/docs/FACTS-JOIN.md), and the
 [Rescue guide](../rescue/README.md).
