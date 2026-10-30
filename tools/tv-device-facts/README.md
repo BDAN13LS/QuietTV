@@ -19,7 +19,7 @@ There are two distinct contexts, and only one of them is a no-TV context:
   outside its own private store, but it is a device-side program that reads the device and writes a
   file — it is not a pure no-write tool.
 
-The parent alone signs, installs, runs and removes the widget and retrieves the result. This slice
+The local operator signs, installs, runs and removes the widget and retrieves the result. This slice
 ships only the sources, an unsigned config template, and a deterministic packager — no signing and
 no installation.
 
@@ -183,8 +183,8 @@ as a universal "install and read any TV" flow.
 
 ## Limitations (what this slice does NOT do)
 
-- No general firmware **split** into firmware + build/revision (deferred until a second device shows
-  the format is stable).
+- No general firmware **split** into firmware + build/revision. A profile-specific mapping needs
+  separate review; support for other models or formats needs its own compatibility evidence.
 - No join of these facts to a profile/capsule identity — the identity scheme is deliberately
   distinct from `tvkit-device-id/1` and no adapter is shipped.
 - No native bridge, no installer, no restore/recovery integration.
@@ -193,13 +193,13 @@ as a universal "install and read any TV" flow.
 - DUID reset semantics are unchanged from the Samsung FAQ (a factory reset changes the DUID; a
   SmartHub reset does not); no cross-reset or cross-firmware identity stability is claimed.
 
-## Unresolved (await live result before the general adapter)
+## Remaining integration work
 
 - `/etc/info.ini` is generic (`Model=Tizen9/TV`, `Build=latest`) and unusable for SKU/firmware;
   `/etc/tizen-release` gives the OS version and a BUILD_ID that is **not** the Samsung firmware
   revision. The network API returned `firmwareVersion` literally `Unknown`. The Product API is the
   authoritative route, and its real values are now observed once (see "Tested once on real
   hardware" above); whether they are stable across models/firmware is still open.
-- Whether `getFirmware()` needs splitting into firmware + firmwareBuild is **deferred** until a
-  second device confirms the returned format (`T-X22UDFAKUC-0090-1300.8` so far).
+- A reviewed adapter must define how the observed firmware string maps to a specific profile
+  (`T-X22UDFAKUC-0090-1300.8` on the reference TV); no general split rule is assumed here.
 - No production `tvkit-profile/2` exists yet; no field here enables profile matching or install.

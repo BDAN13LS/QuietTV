@@ -13,13 +13,14 @@ The verified profile remains Samsung UN43U8000FBXZA / firmware 1300.8 / Tizen 9 
 - [x] Local MCP/CLI status, controls, screenshots and optional Wake-on-LAN.
 - [x] Real package archive and security-metadata capture with TV/PC digest checks.
 - [x] PC capsule assembly that streams archive bytes, with integrity and memory regression tests.
+- [x] Official Samsung firmware/model/country probe verified on the reference TV, with hashed identity output.
 - [x] AI setup prompt and client configuration guides; Codex and Opus 4.8 have assisted project work.
 
 These checks do not establish a full stock-TV installation or a complete live restore.
 
 ## Consumer-release priorities
 
-- [ ] Read and verify exact device/firmware facts automatically; do not infer a match from Unknown.
+- [ ] Integrate observed device/firmware facts into guided setup and exact profile matching; never infer a match from Unknown.
 - [ ] Publish the compatible privileged connection and per-owner setup components.
 - [ ] Complete restore support for the loader references used by Tizen packages.
 - [ ] Verify full off-TV backup restoration and independent Rescue on hardware.
