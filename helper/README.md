@@ -178,7 +178,8 @@ You point it at:
   (`02e9228c81f6b519879036a7041b40233ddca0e908a46952ebbcd1e1ed8e5a42`) first.
 - `--data-dir <OWNER_STORAGE>\quiettv-a2s` — a **private per-owner** data directory, created
   owner-only, **outside every git checkout**. The CLI's shared default (`%APPDATA%\Apps2Samsung`)
-  is never used: this tool always passes `--data-dir` and sets `APPS2SAMSUNG_DATA_DIR`, and it
+  is never used: this tool points every CLI call at your directory by setting the
+  `APPS2SAMSUNG_DATA_DIR` environment variable the upstream reads (per `CliPaths.cs`), and it
   strips `GITHUB_TOKEN` and other `APPS2SAMSUNG_*` variables from the child environment.
 
 ### Verbs
@@ -217,17 +218,22 @@ python -B helper/bootstrap.py acquire
     disk, an unreadable or malformed author, or a mismatch is **refused** with no CLI run. A
     first-seen (unpinned) author is adopted only with `--trust-current-author`.
   - **Default is reuse-only, and mint/extend is staged before it ever touches your store.** If the
-    DUID is already covered by a usable author, the reuse branch returns **without calling the CLI
-    at all**. If covering the DUID needs a Samsung sign-in (a new author, or extending the
+    DUID is already covered by a usable author, the reuse branch returns without minting: it still
+    runs the local `cert --json` inspect to read the profile, but it never runs `cert --prepare` and
+    never triggers a Samsung sign-in. If covering the DUID needs a Samsung sign-in (a new author, or
+    extending the
     distributor to a new DUID), `prepare` **refuses** unless you pass `--allow-samsung-signin`.
     When it does proceed, it never runs `cert --prepare` against your real store: it stages into an
     owner-private candidate directory (`<DIR>\quiettv-bootstrap\candidates\<random>`, copying the
     existing profile for an extend so the author keypair is reused), runs the CLI there, and only
     after the candidate covers the **requested** DUID exactly and its author fingerprint is
-    unchanged/matches the pin does it atomically activate the candidate over the real profile (with
-    backup-and-restore). On **any** failure the candidate is discarded and your existing
-    `author.p12`/`distributor.p12`/`password.txt` are left **byte-for-byte unchanged**. Any password
-    or OTP is entered **only** in Samsung's own sign-in page the upstream opens — never collected by
+    unchanged/matches the pin does it activate the candidate over the real profile. A backup of the
+    prior profile is **retained until every remaining fallible step — the final fingerprint confirm
+    and the pin write (including its ACL) — has succeeded**; on **any** failure, at any point, the
+    candidate is discarded, the original profile bytes are restored from the backup, and a freshly
+    written pin is removed, so your existing `author.p12`/`distributor.p12`/`password.txt` and pin
+    state are left **byte-for-byte unchanged** and nothing is silently deleted. Any password or OTP
+    is entered **only** in Samsung's own sign-in page the upstream opens — never collected by
     QuietTV. Prints a status-only result (`reused`, `coveredDuidCount`, `authorPinRecorded`); never
     the DUID or a path.
 - **`acquire`** — prints the **honest refused acquisition state** (see the gap below). It reads
@@ -261,6 +267,15 @@ acquisition seam must account for it. `bootstrap.py acquire` states all of this 
 missing operation and the SDB-kill constraint — for the parent to act on.
 
 ## Tests
+
+`bootstrap.py` needs the pinned `cryptography` from `helper/requirements-bootstrap.txt`, installed
+into an **isolated** virtual environment (never shared/system Python):
+
+```
+python -m venv .venv-bootstrap
+.venv-bootstrap\Scripts\activate
+python -m pip install -r helper/requirements-bootstrap.txt
+```
 
 ```
 python -B -m unittest tests.test_helper_session tests.test_helper_server tests.test_helper_preflight tests.test_helper_bootstrap

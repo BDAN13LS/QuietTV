@@ -294,6 +294,14 @@ class DataDirTests(BaseTest):
         with self.assertRaises(bs.BootstrapError):
             bs.resolve_data_dir(str(self.tmp / ".." / "x"), create=True)
 
+    def test_relative_and_drive_relative_refused(self):
+        # A raw relative path must be refused BEFORE abspath() can anchor it to the current directory;
+        # a Windows drive-relative path (drive but no root) must be refused too. Checked on
+        # _validate_local_path directly so the repo-location check cannot coincidentally mask it.
+        for value in ("relative\\data", "relative/data", "C:relative-no-root"):
+            with self.assertRaises(bs.BootstrapError):
+                bs._validate_local_path(value, "--data-dir", must_exist=False)
+
     @unittest.skipUnless(sys.platform == "win32" and hasattr(__import__("_winapi"), "CreateJunction"),
                          "Windows junctions only")
     def test_junction_refused(self):
@@ -396,6 +404,50 @@ class PrepareTests(BaseTest):
         activated = dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME["Public"] / bs.AUTHOR_FILE
         self.assertEqual(bs._author_fingerprint(activated.parent), fp)  # identity preserved
         self.assertNotEqual(activated.read_bytes(), before_bytes)  # file replaced by the activated candidate
+
+    def profile_bytes(self, dd, level="Public"):
+        prof = dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME[level]
+        return {name: (prof / name).read_bytes()
+                for name in (bs.AUTHOR_FILE, bs.DISTRIBUTOR_FILE, bs.PASSWORD_FILE)}
+
+    def test_pin_write_failure_rolls_back_profile_and_pin(self):
+        # Unpinned existing author A; an extend that keeps author A (new encryption) covering DUID1.
+        # If the final pin write fails, the original profile bytes AND the pin must be rolled back:
+        # no originals silently deleted on a failed operation.
+        dd = self.data_dir()
+        fp = self.seed_author(dd, "Public", "A", "pw")
+        before = self.profile_bytes(dd)
+        spec = self.write_spec(
+            inspect=inspect_doc(profile("Public", duids=[DUID2]),  # usable, does not cover DUID1
+                                profile("Partner", exists=False, usable=False)),
+            prepare=prepare_doc("Public", [DUID2, DUID1]),
+            writeAuthorP12={"Public": {"src": self.p12_src("A", "re-encrypted-pw"),
+                                       "password": "re-encrypted-pw"}})
+        real_write_pin = bs._write_pin
+
+        def boom(*a, **k):
+            raise OSError("synthetic pin-write failure")
+
+        bs._write_pin = boom
+        self.addCleanup(setattr, bs, "_write_pin", real_write_pin)
+        with self.assertRaises(bs.BootstrapError):
+            bs.prepare_certificate(self.dep(spec), dd, duid=DUID1, level="Public", allow_sign_in=True)
+        self.assertEqual(self.profile_bytes(dd), before)         # every credential byte unchanged
+        self.assertEqual(bs._author_fingerprint(
+            dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME["Public"]), fp)
+        self.assertIsNone(bs._load_pin(dd, "Public"))            # no fresh pin left behind
+        prof = dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME["Public"]
+        self.assertFalse(list(prof.parent.glob("*.bak-*")))      # no backup leaked
+
+    def test_damaged_password_utf8_is_finite_error(self):
+        dd = self.data_dir()
+        self.seed_author(dd, "Public", "A", "pw")
+        (dd / bs.CERT_SUBDIR / bs.PROFILE_DIR_NAME["Public"] / bs.PASSWORD_FILE).write_bytes(b"\xff\xfe\x00bad")
+        spec = self.write_spec(inspect=inspect_doc(profile("Public", duids=[DUID1]),
+                                                   profile("Partner", exists=False, usable=False)),
+                               prepare=prepare_doc("Public", [DUID1]))
+        with self.assertRaises(bs.BootstrapError):  # not a raw UnicodeError traceback
+            bs.prepare_certificate(self.dep(spec), dd, duid=DUID1, level="Public", trust_current_author=True)
 
     def test_author_change_during_prepare_refused_originals_untouched(self):
         dd = self.data_dir()

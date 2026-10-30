@@ -1,0 +1,11 @@
+# Dependencies for helper/bootstrap.py (the owner-invoked certificate path).
+#
+# Install into an ISOLATED virtual environment, never the shared/system Python:
+#
+#   python -m venv .venv-bootstrap
+#   .venv-bootstrap\Scripts\activate       (Windows)
+#   python -m pip install -r helper/requirements-bootstrap.txt
+#
+# cryptography is the mature, official PyPI PKCS#12 reader used to take the author
+# certificate's DER SHA-256 fingerprint. Pinned to the version verified for this slice.
+cryptography==49.0.0

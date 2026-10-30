@@ -161,6 +161,11 @@ def _validate_local_path(value: str, label: str, *, must_exist: bool) -> Path:
         _fail(f"{label} must be a real local path")
     if "://" in value or value.startswith(("\\\\", "//")):
         _fail(f"{label} must be a local path, not a URL or network share")
+    # Reject a raw relative path BEFORE abspath() can silently anchor it to the current directory.
+    # This also catches a Windows drive-relative path (e.g. "C:foo"), which has a drive but no root.
+    drive, tail = os.path.splitdrive(value)
+    if not os.path.isabs(value) or (drive and not tail.startswith(("\\", "/"))):
+        _fail(f"{label} must be an absolute path (not relative or drive-relative)")
     raw = os.path.abspath(value)
     path = Path(raw)
     if not path.is_absolute() or ".." in Path(value).parts:
@@ -470,7 +475,11 @@ def _author_fingerprint(profile_dir: Path) -> str | None:
     if pw_path is None:
         _fail("the signing profile has an author certificate but no password file")
     p12_bytes = _read_bounded(author, MAX_AUTHOR_BYTES, "author certificate")
-    password = _read_bounded(pw_path, MAX_CERT_FILE_BYTES, "certificate password file").decode("utf-8", "strict").strip()
+    try:
+        password = _read_bounded(pw_path, MAX_CERT_FILE_BYTES,
+                                 "certificate password file").decode("utf-8", "strict").strip()
+    except UnicodeError:
+        _fail("the certificate password file is not valid UTF-8")
     return author_cert_fingerprint(p12_bytes, password)
 
 
@@ -606,10 +615,13 @@ def _bounded_copy(src_dir: Path, dst_dir: Path) -> None:
         _make_private_file(dst_dir / name)
 
 
-def _activate(candidate_profile_dir: Path, real_profile_dir: Path) -> None:
-    """Replace the real profile dir with the validated candidate, atomically per rename, with restore.
+def _activate(candidate_profile_dir: Path, real_profile_dir: Path) -> Path | None:
+    """Move the validated candidate into the owner store, returning the backup of any prior profile.
 
-    The originals are byte-unchanged until this point; only here does the owner store change.
+    The originals are byte-unchanged until this point; only here does the owner store change. The
+    backup is NOT deleted here: the caller keeps it until every remaining fallible step (the final
+    fingerprint confirm and the pin write) has succeeded, then deletes it, or restores from it on any
+    failure. On a rename failure the originals are restored here and a finite BootstrapError is raised.
     """
     real_profile_dir.parent.mkdir(parents=True, exist_ok=True)
     token = secrets.token_hex(8)
@@ -622,9 +634,28 @@ def _activate(candidate_profile_dir: Path, real_profile_dir: Path) -> None:
     except OSError:
         if backup is not None and not real_profile_dir.exists():
             os.rename(backup, real_profile_dir)  # restore the originals unchanged
-        raise
-    if backup is not None:
-        shutil.rmtree(backup, ignore_errors=True)
+        _fail("the signing profile could not be activated; the originals were left unchanged")
+    return backup
+
+
+def _restore_profile(real_profile_dir: Path, backup: Path | None) -> None:
+    """Undo an activation: discard whatever was activated and move the backup back, if any."""
+    try:
+        shutil.rmtree(real_profile_dir, ignore_errors=True)
+        if backup is not None:
+            os.rename(backup, real_profile_dir)
+    except OSError:
+        pass
+
+
+def _remove_pin_quietly(data_dir: Path, level: str) -> None:
+    """Best-effort removal of a freshly written pin during rollback (there was none before)."""
+    try:
+        path = _pin_path(data_dir, level)
+        if path.exists():
+            path.unlink()
+    except OSError:
+        pass
 
 
 def prepare_certificate(dep: DependencyContract, data_dir: Path, *, duid: str, level: str = "Public",
@@ -707,17 +738,36 @@ def prepare_certificate(dep: DependencyContract, data_dir: Path, *, duid: str, l
         if expected is not None and candidate_fp != expected:
             _fail("the prepared author identity does not match the pinned identity; refusing")
 
-        _activate(candidate_profile_dir, real_profile_dir)
+        backup = _activate(candidate_profile_dir, real_profile_dir)
     finally:
         shutil.rmtree(candidate, ignore_errors=True)
 
-    final_fp = _author_fingerprint(real_profile_dir)
-    if final_fp is None or final_fp != candidate_fp:
-        _fail("the activated certificate could not be confirmed; refusing")
+    # The owner store now holds the candidate, but the backup is retained until BOTH remaining
+    # fallible steps succeed. Any failure here (final verify, pin write, pin ACL) rolls the original
+    # profile bytes AND the pin back, so no originals are silently deleted on a failed operation.
     pin_recorded = False
-    if pinned is None:
-        _write_pin(data_dir, level, final_fp)
-        pin_recorded = True
+    committed = False
+    try:
+        try:
+            final_fp = _author_fingerprint(real_profile_dir)
+            if final_fp is None or final_fp != candidate_fp:
+                _fail("the activated certificate could not be confirmed; refusing")
+            if pinned is None:
+                _write_pin(data_dir, level, final_fp)
+                pin_recorded = True
+            committed = True
+        finally:
+            if committed:
+                if backup is not None:
+                    shutil.rmtree(backup, ignore_errors=True)
+            else:
+                if pinned is None:
+                    _remove_pin_quietly(data_dir, level)
+                _restore_profile(real_profile_dir, backup)
+    except BootstrapError:
+        raise
+    except OSError:
+        _fail("the signing profile could not be finalized; it was rolled back unchanged")
     return {"ok": True, "verb": "prepare", "level": level, "reused": False,
             "coveredDuidCount": len(profile["duids"]), "authorPinRecorded": pin_recorded}
 
