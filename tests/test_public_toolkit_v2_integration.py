@@ -280,20 +280,27 @@ class V2Integration(unittest.TestCase):
 
 
 class ExportAllowlist(unittest.TestCase):
-    def test_only_consumer_fixture_json_is_allowlisted(self):
+    def test_only_reviewed_consumer_and_bootstrap_fixtures_are_allowlisted(self):
         data = json.loads((fx.TOOLKIT / "export-allowlist.json").read_text(encoding="utf-8"))
         fixture_entries = [e for e in data["include"] if e.startswith("tests/fixtures")]
         self.assertEqual(sorted(fixture_entries), [
+            "tests/fixtures/a2s_cli_fixture.py",
             "tests/fixtures/consumer/components.json",
             "tests/fixtures/consumer/inventory.json",
             "tests/fixtures/consumer/profile-v2.json",
             "tests/fixtures/recovery2/boot-policy.json",
-            "tests/fixtures/recovery2/external-policy.json"])
+            "tests/fixtures/recovery2/external-policy.json",
+            "tests/fixtures/runner_tree_fixture.py"])
         for entry in fixture_entries:
             self.assertTrue((fx.ROOT / entry).is_file(), entry)
             text = (fx.ROOT / entry).read_text(encoding="utf-8")
             self.assertNotIn('"deviceId"', text)
-            self.assertTrue("org.example" in text or "SYNTHETIC" in text, entry)
+            if entry.endswith(".json"):
+                self.assertTrue("org.example" in text or "SYNTHETIC" in text, entry)
+            else:
+                # The two explicitly named executable fixtures create synthetic child processes;
+                # no fixture-directory wildcard or arbitrary executable is admitted.
+                self.assertIn("synthetic", text.lower(), entry)
 
     RECOVERY2_FILES = ("public-toolkit/tvkit/recovery2.py", "public-toolkit/docs/RECOVERY2.md",
                        "tests/test_public_toolkit_recovery2.py", "tests/fixtures/recovery2/boot-policy.json",
