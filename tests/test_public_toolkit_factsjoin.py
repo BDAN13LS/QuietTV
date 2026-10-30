@@ -19,6 +19,7 @@ import hashlib
 import json
 import sys
 import tempfile
+import traceback
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -318,6 +319,34 @@ class Negatives(JoinBase):
             self.fail("expected refusal")
         except fj.JoinError as exc:
             self.assertNotIn("SEKRIT-STATUS", str(exc))
+
+    def test_strict_json_refusal_never_leaks_a_user_controlled_key(self):
+        # strictjson's own unknown/duplicate-key messages echo the property name; the
+        # factsjoin boundary must sanitize that away (str AND the traceback).
+        marker = "SEKRIT-PROPERTY"
+        valid = json.dumps(product_info_dict())
+        unknown_key = valid[:-1] + f', "{marker}": "x"}}'          # an unexpected top-level property
+        duplicate_key = '{"schema": "a", "schema": "b", "' + marker + '": "x"}'  # a duplicate key
+        for label, raw in (("unknown", unknown_key), ("duplicate", duplicate_key)):
+            with self.subTest(label=label):
+                try:
+                    fj.parse_product_info(raw.encode("utf-8"))
+                    self.fail("expected refusal")
+                except fj.JoinError as exc:
+                    self.assertNotIn(marker, str(exc))
+                    self.assertNotIn(marker, "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+        # The valid report still parses.
+        self.assertEqual(fj.parse_product_info(valid.encode("utf-8")).real_model, "SYNTHETIC-QTV0001")
+
+    def test_strict_json_policy_refusal_never_leaks_a_user_controlled_key(self):
+        marker = "SEKRIT-POLICY-KEY"
+        raw = '{"schema": "x", "schema": "y", "' + marker + '": "z"}'
+        try:
+            fj.join_policy_from_json(raw.encode("utf-8"))
+            self.fail("expected refusal")
+        except fj.JoinError as exc:
+            self.assertNotIn(marker, str(exc))
+            self.assertNotIn(marker, "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
 
     def test_profile_mismatch_refused_by_match_device(self):
         wrong = copy.deepcopy(pv2.load("profile-v2.json"))

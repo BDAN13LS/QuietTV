@@ -281,8 +281,11 @@ def parse_product_info(raw: bytes | str) -> ProductInfoReport:
             raise JoinError("ProductInfo identity was not observed; refusing (a join needs a device identity)")
         if "digest" not in identity or not is_sha256(identity["digest"]):
             raise JoinError("ProductInfo identity digest is missing or malformed; refusing")
-    except sj.StrictJsonError as exc:
-        raise JoinError(str(exc)) from exc
+    except sj.StrictJsonError:
+        # strictjson messages can echo a user-controlled property name (an unknown
+        # or duplicate key); drop the cause (`from None`) and the message so a refusal
+        # never leaks a received value, per this module's no-received-values contract.
+        raise JoinError("ProductInfo report is not well-formed strict JSON; refusing") from None
     return ProductInfoReport(
         firmware=values["firmware"], real_model=values["realModel"], model=values["model"],
         model_code=values["modelCode"], service_country=values["serviceCountry"],
@@ -426,8 +429,10 @@ def join_policy_from_json(raw: bytes | str) -> JoinPolicy:
                   "machine": sj.require_str(native["machine"], "join policy.native.machine")}
         interpreted = sj.require_object(top["interpreted"], "join policy.interpreted", _INTERPRETED_FIELDS)
         interpreted = {k: sj.require_str(interpreted[k], f"join policy.interpreted.{k}") for k in _INTERPRETED_FIELDS}
-    except sj.StrictJsonError as exc:
-        raise JoinError(str(exc)) from exc
+    except sj.StrictJsonError:
+        # Same no-received-values contract as parse_product_info: a strictjson message
+        # can echo a user-controlled key, so drop the cause and the message.
+        raise JoinError("join policy is not well-formed strict JSON; refusing") from None
     # JoinPolicy.__post_init__ re-validates concreteness, types and freezes the inputs.
     return JoinPolicy(sj.require_str(top["profileId"], "join policy.profileId"),
                       sj.require_str(top["identityScheme"], "join policy.identityScheme"),

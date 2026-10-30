@@ -81,6 +81,15 @@ own digest — equals the supplied one. A forged receipt whose own
 matcher or screen is reached. This is source/policy verification, not a
 signature or attestation; a trusted transport is still future work.
 
+**The caller must supply two observations that genuinely come from the same TV.**
+The join checks that the two observations agree with the trusted policy; it does
+**not** authenticate their pairing or their freshness. The input SHA-256 digests
+and the receipt digest bind *which bytes* were joined — they do not prove the
+bytes are recent or that the ProductInfo report and the native inventory were
+read from the same device. The `quiettv-device-facts/1` report carries the only
+per-device identity (the on-device DUID digest); the `quiettv-inspection/1`
+native inventory has **no** per-device identity and never asserts one.
+
 ## Public API and parent invocation
 
 ```python
