@@ -126,7 +126,7 @@ class ConfigLoaderTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(hs.PreflightConfigError):
                 hs.load_preflight_config(path)
 
-    @unittest.skipUnless(hasattr(__import__("_winapi"), "CreateJunction"), "Windows junctions only")
+    @unittest.skipUnless(sys.platform == "win32" and hasattr(__import__("_winapi"), "CreateJunction"), "Windows junctions only")
     def test_parent_junction_source_refused(self):
         import _winapi
         realdir = Path(self.tmp) / "real"
@@ -160,7 +160,7 @@ class LocalFileReaderTests(unittest.TestCase):
         with self.assertRaises(hs._PreflightSourceError):
             hs._read_local_file(self.tmp, 50)  # a directory is not a regular file
 
-    @unittest.skipUnless(hasattr(__import__("_winapi"), "CreateJunction"), "Windows junctions only")
+    @unittest.skipUnless(sys.platform == "win32" and hasattr(__import__("_winapi"), "CreateJunction"), "Windows junctions only")
     def test_parent_junction_refused_both_ways(self):
         import _winapi
         realdir = Path(self.tmp) / "real"
