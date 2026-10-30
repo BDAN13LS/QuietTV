@@ -133,7 +133,7 @@ class BindTests(ServerCase):
 
     def test_cli_has_no_port_host_or_target_option(self):
         opts = {a for action in srv.build_parser()._actions for a in action.option_strings}
-        self.assertEqual(opts, {"-h", "--help", "--no-browser", "--launch-file"})
+        self.assertEqual(opts, {"-h", "--help", "--no-browser", "--launch-file", "--preflight-config"})
 
 
 class StaticTests(ServerCase):

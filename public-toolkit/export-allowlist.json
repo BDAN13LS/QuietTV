@@ -36,6 +36,7 @@
     "helper/ui/style.css",
     "tests/test_helper_server.py",
     "tests/test_helper_session.py",
+    "tests/test_helper_preflight.py",
     "tests/test_helper_ui.mjs",
     "tools/tv-inspect/.gitignore",
     "tools/tv-inspect/QuietTVInspect.csproj",

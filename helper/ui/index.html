@@ -29,7 +29,7 @@
           <li><button type="button" class="nav-item" data-screen="report"><span class="num">6</span>Report</button></li>
         </ol>
       </nav>
-      <p class="side-note">This preview only reads your TV's public information page. It never installs, removes or restores anything.</p>
+      <p class="side-note">This preview reads your TV's public information page, and (if configured) checks saved report files offline. It never installs, removes or restores anything.</p>
     </aside>
 
     <main id="main" tabindex="-1">
@@ -67,6 +67,22 @@
         <div class="card">
           <h2>Before you start</h2>
           <ul class="plain" id="prereqs"></ul>
+        </div>
+
+        <div class="card" id="preflight-card" hidden>
+          <h2>Saved report preflight (advanced)</h2>
+          <p class="hint">This checks saved report files you chose when starting QuietTV Helper, using the offline device-facts join. It is <strong>not</strong> a live connection to your TV, not verified support and not installation eligibility. It changes and enables nothing.</p>
+          <p class="hint" id="preflight-hint" hidden></p>
+          <div class="row" id="preflight-actions" hidden>
+            <button type="button" id="preflight-btn">Check saved reports</button>
+            <span class="msg" id="preflight-msg" role="status" aria-live="polite"></span>
+          </div>
+          <div id="preflight-result" hidden>
+            <h3>Facts from the saved reports</h3>
+            <dl class="facts" id="preflight-facts"></dl>
+            <p class="hint" id="preflight-note"></p>
+            <p class="hint" id="preflight-provenance"></p>
+          </div>
         </div>
       </section>
 

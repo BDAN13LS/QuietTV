@@ -243,6 +243,108 @@ test("form line: no job on load clears stale checking text", async () => {
   assert.deepEqual(seen, [{ text: "", error: false }]);
 });
 
+// ---- saved-report preflight ----
+
+function preflightState(overrides = {}) {
+  const fields = [
+    { field: "model", label: "model number", value: "SYNTHETIC-QTV0001", source: "observed:productInfo.realModel" },
+    { field: "firmware", label: "software (firmware) version", value: "0000.1", source: "interpreted" },
+    { field: "arch", label: "processor type", value: "armv7l", source: "observed:native.machine" },
+    { field: "osName", label: "operating system", value: "Tizen", source: "interpreted" },
+    { field: "osVersion", label: "Tizen version", value: "9", source: "interpreted" },
+    { field: "firmwareBuild", label: "full firmware build", value: "SYNTHETIC-BUILD-0000.1", source: "observed:productInfo.firmware" },
+    { field: "region", label: "sales region", value: "SYNTHETIC-REGION", source: "interpreted" },
+  ];
+  const success = { configured: true, status: "success", error: null, result: {
+    profileId: "SYNTHETIC-QTV0001-0000.1-armv7l-tizen9", identityScheme: "quiettv-device-facts-duid/sha256/1",
+    fields, note: "Preflight display only.", operatorAssertions: { trustPolicyAndProfile: true, pairedFromSameTv: true } } };
+  return state({ preflight: { ...success, ...overrides } });
+}
+
+test("preflight static: posted only from its handler with an empty body, sources never named in the page", () => {
+  assert.equal(SRC.split('"/api/preflight"').length - 1, 1);
+  assert.match(SRC, /function onPreflight[\s\S]*"\/api\/preflight", \{\}\)[\s\S]*function/);
+  // The page never names or chooses a source (those are startup config only); it only shows the flag name in a hint.
+  for (const banned of ["productInfoReport", "nativeInspectionFrame", "joinPolicy"]) {
+    assert.ok(!SRC.includes(banned), banned);
+  }
+});
+
+test("preflight success: seven fields render as literal text with their source labels", async () => {
+  const h = harness("#t=" + TOKEN, () => ({ status: 200, data: preflightState() }));
+  h.ready();
+  await flush();
+  assert.equal(h.getEl("preflight-card").hidden, false);
+  assert.equal(h.getEl("preflight-result").hidden, false);
+  const text = h.getEl("preflight-facts").textContent;
+  for (const v of ["SYNTHETIC-QTV0001", "0000.1", "armv7l", "SYNTHETIC-REGION"]) assert.ok(text.includes(v), v);
+  assert.ok(text.includes("read from the saved ProductInfo report"));
+  assert.ok(text.includes("interpreted by your trusted policy"));
+  assert.ok(h.getEl("preflight-msg").textContent.includes("complete"));
+});
+
+test("preflight success: a hostile field value stays literal text (innerHTML would throw)", async () => {
+  const hostile = preflightState();
+  hostile.preflight.result.fields[0].value = HOSTILE;
+  const h = harness("#t=" + TOKEN, () => ({ status: 200, data: hostile }));
+  h.ready();
+  await flush();
+  assert.ok(h.getEl("preflight-facts").textContent.includes(HOSTILE));
+});
+
+test("preflight success does not change the live check facts", async () => {
+  const combined = preflightState();
+  combined.check = DONE_CHECK;  // modelSupported false -> live card shows the honest gaps
+  combined.target = TARGET;
+  const h = harness("#t=" + TOKEN, () => ({ status: 200, data: combined }));
+  h.ready();
+  await flush();
+  const live = h.getEl("facts").textContent;
+  assert.ok(live.includes("Not proven"), "live exact-match line unchanged");
+  assert.ok(live.includes("Ready to install"), "live ready-to-install line unchanged");
+});
+
+test("preflight unconfigured: a startup hint, the button hidden, no fake success", async () => {
+  const h = harness("#t=" + TOKEN, () => ({ status: 200,
+    data: state({ preflight: { configured: false, status: "idle", error: null, result: null } }) }));
+  h.ready();
+  await flush();
+  assert.equal(h.getEl("preflight-card").hidden, false);
+  assert.equal(h.getEl("preflight-actions").hidden, true);
+  assert.equal(h.getEl("preflight-hint").hidden, false);
+  assert.ok(h.getEl("preflight-hint").textContent.includes("--preflight-config"));
+  assert.equal(h.getEl("preflight-result").hidden, true);
+  assert.equal(h.getEl("preflight-msg").textContent, "");
+});
+
+test("preflight running: the button is disabled and a checking message shows", async () => {
+  const h = harness("#t=" + TOKEN, () => ({ status: 200,
+    data: state({ preflight: { configured: true, status: "running", error: null, result: null } }) }));
+  h.ready();
+  await flush();
+  assert.equal(h.getEl("preflight-btn").disabled, true);           // no second run while one is in flight
+  assert.equal(h.getEl("preflight-result").hidden, true);          // nothing claimed mid-run
+  assert.ok(h.getEl("preflight-msg").textContent.includes("Checking"));
+});
+
+test("preflight button posts an empty body to /api/preflight", async () => {
+  const seq = [preflightState({ status: "idle", result: null }), preflightState()];
+  let i = 0;
+  const h = harness("#t=" + TOKEN, (url) => {
+    if (url === "/api/preflight") return { status: 200, data: seq[Math.min(++i, seq.length - 1)] };
+    return { status: 200, data: seq[0] };
+  });
+  h.ready();
+  await flush();
+  h.getEl("preflight-btn").listeners.click();
+  await settle();
+  const post = h.calls.fetch.find((c) => c.url === "/api/preflight");
+  assert.ok(post, "preflight was posted");
+  assert.equal(post.init.method, "POST");
+  assert.equal(post.init.body, "{}");
+  assert.equal(post.init.headers["X-QuietTV-Session"], TOKEN);
+});
+
 test("form line: a refused address keeps its message after a finished check", async () => {
   const done = state({ target: TARGET, lastJob: { id: "job4", status: "done" }, check: DONE_CHECK });
   const refusal = "Type the TV's address as four numbers separated by dots.";

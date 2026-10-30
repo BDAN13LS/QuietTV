@@ -108,6 +108,7 @@ button:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 .tone-good { color: var(--good); }
 .tone-warn { color: var(--warn); }
 .tone-bad { color: var(--bad); }
+.facts dd .src { color: var(--muted); font-size: 13px; }
 
 ul.plain, ul.missing, ul.gates, ol.numbered { margin: 0; padding-left: 20px; }
 ul.plain li, ul.missing li, ul.gates li, ol.numbered li { margin: 4px 0; }
