@@ -35,6 +35,15 @@
   var SERVICE_COUNTRY_KEY = "CONFIG_KEY_SERVICE_COUNTRY";
   var PRIVATE_OUTPUT = "wgt-private/device-facts.json";
 
+  // Bounds and placeholder rejection for every observed string, so malformed or non-answer values
+  // (the network API returns the literal "Unknown") can never count as observed/complete, and a
+  // single giant value cannot blow up the output. Valid values are kept byte-exact; these checks
+  // only REJECT, they never trim or rewrite an accepted value.
+  var MAX_FIELD_CHARS = 4096;
+  var SHA256_BYTES = 32;
+  // Case-insensitive, trimmed placeholders that are an absence of an answer, not a real fact.
+  var PLACEHOLDERS = ["unknown"];
+
   // The EXACT, finite allowlist of Product API methods this probe may touch. index.html and the
   // tests assert the collector accesses nothing else, and nothing named set* or *Listener*.
   var STRING_FIELDS = [
@@ -69,6 +78,47 @@
     return new TextEncoder().encode(text);
   }
 
+  function hasControlChar(text) {
+    for (var i = 0; i < text.length; i++) {
+      var code = text.charCodeAt(i);
+      if (code < 0x20 || code === 0x7f) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function isPlaceholder(text) {
+    var folded = text.trim().toLowerCase();
+    for (var i = 0; i < PLACEHOLDERS.length; i++) {
+      if (folded === PLACEHOLDERS[i]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Classifies a raw string into "observed" or a finite rejection code. Length is checked before
+  // any whitespace/placeholder work, so an oversize value is rejected without further processing.
+  function classifyString(raw) {
+    if (typeof raw !== "string") {
+      return "not-a-string";
+    }
+    if (raw.length > MAX_FIELD_CHARS) {
+      return "too-long";
+    }
+    if (raw.trim().length === 0) {
+      return "empty"; // covers "" and whitespace-only
+    }
+    if (hasControlChar(raw)) {
+      return "unsafe";
+    }
+    if (isPlaceholder(raw)) {
+      return "placeholder";
+    }
+    return "observed";
+  }
+
   // Reads one string-valued Product API field. Returns a coded status; the raw value is kept
   // EXACTLY as returned when present. Finite statuses only: observed, api-unavailable, threw,
   // not-a-string, empty.
@@ -92,12 +142,9 @@
       record.status = "threw";
       return record;
     }
-    if (typeof raw !== "string") {
-      record.status = "not-a-string";
-      return record;
-    }
-    if (raw.length === 0) {
-      record.status = "empty";
+    var status = classifyString(raw);
+    if (status !== "observed") {
+      record.status = status;
       return record;
     }
     record.value = raw; // exact, unmodified
@@ -118,12 +165,9 @@
       record.status = "threw";
       return record;
     }
-    if (typeof raw !== "string") {
-      record.status = "not-a-string";
-      return record;
-    }
-    if (raw.length === 0) {
-      record.status = "empty";
+    var status = classifyString(raw);
+    if (status !== "observed") {
+      record.status = status;
       return record;
     }
     record.value = raw;
@@ -147,24 +191,41 @@
       record.status = "duid-threw";
       return Promise.resolve(record);
     }
-    if (typeof duid !== "string" || duid.length === 0) {
-      record.status = "duid-empty";
+    // The DUID is bounds- and placeholder-checked like any field, but with duid-prefixed codes.
+    // Its raw value is NEVER placed in the record, even on a rejection.
+    var duidStatus = classifyString(duid);
+    if (duidStatus !== "observed") {
+      record.status = duidStatus === "empty" ? "duid-empty" : "duid-" + duidStatus;
       return Promise.resolve(record);
     }
     if (!subtle || typeof subtle.digest !== "function") {
       record.status = "crypto-unavailable";
       return Promise.resolve(record);
     }
-    var bytes;
+    var digestPromise;
     try {
-      bytes = encodeUtf8(IDENTITY_DOMAIN + duid);
+      // encodeUtf8 and subtle.digest may throw SYNCHRONOUSLY; both are caught here so the failure
+      // becomes a coded status and never escapes collect().
+      var bytes = encodeUtf8(IDENTITY_DOMAIN + duid);
+      digestPromise = subtle.digest("SHA-256", bytes);
     } catch (e) {
       record.status = "hash-threw";
       return Promise.resolve(record);
     }
-    return Promise.resolve(subtle.digest("SHA-256", bytes)).then(
+    return Promise.resolve(digestPromise).then(
       function (buf) {
-        record.digest = toHex(new Uint8Array(buf));
+        var arr;
+        try {
+          arr = new Uint8Array(buf);
+        } catch (e) {
+          record.status = "hash-invalid";
+          return record;
+        }
+        if (arr.length !== SHA256_BYTES) {
+          record.status = "hash-invalid"; // a SHA-256 digest is exactly 32 bytes
+          return record;
+        }
+        record.digest = toHex(arr);
         record.status = "observed";
         return record;
       },
@@ -232,9 +293,9 @@
         if (typeof deps.showSummary === "function") {
           deps.showSummary(summary);
         }
-        if (typeof deps.scheduleExit === "function") {
-          deps.scheduleExit();
-        }
+        // The auto-exit is scheduled ONCE at the widget bootstrap, BEFORE collection, so a
+        // never-resolving write or hash callback can never leave the probe in the foreground; it
+        // is deliberately NOT tied to collect() completing.
         return { result: result, json: json, summary: summary };
       });
     });
@@ -252,6 +313,7 @@
     PRIVATE_OUTPUT: PRIVATE_OUTPUT,
     REQUIRED_KEYS: REQUIRED_KEYS,
     STRING_FIELDS: STRING_FIELDS,
+    MAX_FIELD_CHARS: MAX_FIELD_CHARS,
   };
 
   if (typeof module !== "undefined" && module.exports) {

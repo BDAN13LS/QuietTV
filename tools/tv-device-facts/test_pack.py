@@ -39,6 +39,7 @@ class PackTests(unittest.TestCase):
         config = files["config.xml"].decode("utf-8")
         self.assertIn('id="' + APP_ID + '"', config)
         self.assertIn('package="' + PACKAGE + '"', config)
+        self.assertIn("http://tizen.org/privilege/filesystem.read", config)
         self.assertIn("http://tizen.org/privilege/filesystem.write", config)
         self.assertIn("http://developer.samsung.com/privilege/productinfo", config)
         # No network, author, boot, service, Home or leftover placeholder.
@@ -64,6 +65,11 @@ class PackTests(unittest.TestCase):
             with self.subTest(app_id=app_id, package=package, version=version):
                 with self.assertRaises(pack.PackError):
                     pack.assemble(app_id, package, version)
+
+    def test_mismatched_app_id_prefix_refused(self):
+        # A valid-looking app id whose prefix is not the package id must be refused.
+        with self.assertRaises(pack.PackError):
+            pack.assemble("zzzzzzzzzz.DeviceFacts", PACKAGE, "0.1.0")
 
     def test_non_wgt_and_overwrite_refused(self):
         with self.assertRaises(pack.PackError):

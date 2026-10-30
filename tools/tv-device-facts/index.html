@@ -15,6 +15,13 @@
       h1 { font-size: 28px; }
       pre { font-size: 20px; line-height: 1.4; }
     </style>
+    <!--
+      The Samsung Product/Web API loader. It MUST come before collector.js and the bootstrap, so
+      window.webapis.productinfo is defined when the probe runs. $WEBAPIS is resolved by the Tizen
+      runtime to the local on-device SDK path; this is NOT an external URL and opens no network.
+      Reference: https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references.html
+    -->
+    <script type="text/javascript" src="$WEBAPIS/webapis/webapis.js"></script>
     <script src="collector.js"></script>
   </head>
   <body>
@@ -54,6 +61,12 @@
                         stream.close();
                         resolve();
                       } catch (werr) {
+                        // Always close the stream on a write failure, then report it.
+                        try {
+                          stream.close();
+                        } catch (closeErr) {
+                          // Nothing more to do; the original failure is what matters.
+                        }
                         reject(werr);
                       }
                     },
@@ -92,6 +105,11 @@
         var tizenRef = typeof window !== "undefined" ? window.tizen : undefined;
         var productinfo = webapisRef && webapisRef.productinfo ? webapisRef.productinfo : null;
 
+        // Schedule the bounded auto-exit ONCE, BEFORE collection begins. This guarantees the probe
+        // leaves the foreground even if a filesystem or WebCrypto callback never resolves; the exit
+        // is not tied to collect() completing.
+        scheduleExit();
+
         QuietTVDeviceFacts.collect({
           productinfo: productinfo,
           productInfoConfigKey: productinfo ? productinfo.ProductInfoConfigKey : null,
@@ -100,13 +118,11 @@
           encodeUtf8: encodeUtf8,
           writeFile: writeFile,
           showSummary: showSummary,
-          scheduleExit: scheduleExit,
         }).then(null, function () {
           var el = document.getElementById("summary");
           if (el) {
             el.textContent = "probe failed to record a result";
           }
-          scheduleExit();
         });
       })();
     </script>

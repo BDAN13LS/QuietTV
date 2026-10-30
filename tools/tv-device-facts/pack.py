@@ -65,6 +65,10 @@ def _config_xml(app_id: str, package: str, version: str) -> bytes:
         raise PackError("app id must be <10 alphanumerics>.<name>, e.g. abcdefghij.DeviceFacts")
     if not PACKAGE_RE.fullmatch(package):
         raise PackError("package id must be exactly 10 alphanumerics")
+    # Tizen requires the application id to be prefixed by its package id (<package>.<name>). A
+    # mismatched pair would not install, so refuse it here rather than emit a dead config.
+    if app_id.split(".", 1)[0] != package:
+        raise PackError("app id prefix must equal the package id (<package>.<name>)")
     if not VERSION_RE.fullmatch(version):
         raise PackError("version must look like 0.1.0")
     text = TEMPLATE.read_text("utf-8")

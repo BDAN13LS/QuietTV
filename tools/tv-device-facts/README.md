@@ -20,7 +20,16 @@ Samsung Product API (`webapis.productinfo`):
 https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references/productinfo-api.html
 
 Privilege required: `http://developer.samsung.com/privilege/productinfo` (public).
-Plus `http://tizen.org/privilege/filesystem.write` for the one private-file write.
+Plus `http://tizen.org/privilege/filesystem.read` and `http://tizen.org/privilege/filesystem.write`
+for the one private-file write: the widget resolves its **own** `wgt-private` store in read-write
+mode and resolves the leaf file before (re)writing it, which needs the read privilege as well as
+write. These privileges reach only the app's own private storage; no other path is accessed.
+
+The Samsung Web API loader `<script src="$WEBAPIS/webapis/webapis.js">` is included in `index.html`
+before `collector.js`, per the official Samsung reference
+(https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references.html).
+`$WEBAPIS` is resolved by the Tizen runtime to the on-device SDK path; it is not an external URL and
+opens no network.
 
 ## What it reads (exact, finite allowlist)
 
@@ -40,8 +49,19 @@ no `set*` call, no listener, no network URL, and no startup/service/Home registr
 
 Values are stored **exactly** as the API returns them — no trim, normalisation or splitting (for
 example `uname`'s `armv7l` is not rewritten to `armv7`). No field is ever filled from an expected
-model, firmware or profile value. A field that is missing, throws, returns a non-string or returns
-empty is recorded with that coded status and the overall result is `incomplete`.
+model, firmware or profile value.
+
+A value counts as `observed` only when it is a string of 1–4096 characters that is not
+whitespace-only, carries no control characters (`< 0x20` or `0x7f`), and is not the literal
+placeholder `Unknown` (case-insensitive, the value the network API returns). Anything else is
+recorded with a finite code — `api-unavailable`, `threw`, `not-a-string`, `empty`, `too-long`,
+`unsafe` or `placeholder` — and the overall result is `incomplete`. Accepted values keep their exact
+bytes; these checks only reject, they never trim or rewrite.
+
+On screen the widget shows statuses only, then auto-exits after a short bounded delay that is
+scheduled **once at bootstrap, before collection**, so a filesystem or WebCrypto callback that never
+resolves still cannot leave the probe in the foreground. There is no console logging of raw values
+or the DUID, and no service or background registration.
 
 ## Device identity (hashed, never raw)
 
@@ -50,9 +70,14 @@ The DUID is hashed on the device with WebCrypto:
 - scheme: `quiettv-device-facts-duid/sha256/1`
 - digest: `SHA-256( "quiettv-device-facts-duid/1\n" + DUID )`, lowercase hex
 
-Only `{scheme, digest, status}` is stored. If WebCrypto is unavailable the identity status is
-`crypto-unavailable` and the result is `incomplete` — there is **no** raw fallback. The raw DUID is
-never written to the result, the on-screen summary, a log line or an error.
+Only `{scheme, digest, status}` is stored. The DUID is bounds- and placeholder-checked like any
+field (`duid-empty`, `duid-too-long`, `duid-unsafe`, `duid-placeholder`, `duid-unavailable`,
+`duid-threw`) before hashing, and its raw value is never placed in the record even on a rejection.
+If WebCrypto is unavailable the status is `crypto-unavailable` and the result is `incomplete` — there
+is **no** raw fallback. A `subtle.digest` that throws (synchronously or asynchronously) is coded
+`hash-threw`, and a result that is not exactly a 32-byte SHA-256 digest is coded `hash-invalid`; in
+both cases no digest is emitted. The raw DUID is never written to the result, the on-screen summary,
+a log line or an error.
 
 This scheme is **deliberately distinct** from the existing profile/capsule identity scheme
 (`tvkit-device-id/1` in `public-toolkit/tvkit/profile.py`). This slice introduces no silent
@@ -79,25 +104,25 @@ Written only to `wgt-private/device-facts.json`:
 }
 ```
 
-On screen the widget shows statuses only (no values, no digest), then auto-exits after a short
-bounded delay, leaving the private file for SDK retrieval. There is no console logging of raw values
-or the DUID.
+The on-screen summary carries statuses only (no values, no digest); the full result stays in the
+private file for SDK retrieval.
 
 ## Files
 
 | file | what it is |
 |---|---|
 | `collector.js` | the probe logic; injectable deps, Node- and widget-compatible; the only API-touching code |
-| `index.html` | minimal UI that wires the real Tizen/Samsung globals and the private-file write |
-| `config.xml.template` | unsigned Tizen config; the only privileges are `filesystem.write` and `productinfo` |
+| `index.html` | minimal UI that loads the Samsung `webapis.js`, wires the real globals, writes the private file, and schedules the bounded exit |
+| `config.xml.template` | unsigned Tizen config; the only privileges are `filesystem.read`, `filesystem.write` and `productinfo` |
 | `pack.py` | deterministic stdlib packager (`.wgt`); no signing, no install; refuses an output inside any repo |
-| `collector.test.js` | pure-Node tests (fake webapis): allowlist, hash, errors, incomplete, no raw DUID, fake filesystem write |
-| `test_pack.py` | packager tests: determinism, config contents, bad ids, overwrite, outside-repo refusals |
+| `collector.test.js` | pure-Node tests (fake webapis): allowlist, hash, errors, placeholder/bounds, incomplete, no raw DUID, fake filesystem write |
+| `index.test.js` | pure-Node tests for the bootstrap: loader order, productinfo wiring, bounded exit scheduled before collection |
+| `test_pack.py` | packager tests: determinism, config contents, bad/mismatched ids, overwrite, outside-repo refusals |
 
 ## Build and test
 
 ```
-node --test tools/tv-device-facts/collector.test.js
+node --test tools/tv-device-facts/collector.test.js tools/tv-device-facts/index.test.js
 python -m unittest test_pack            # from this folder
 # package (owner ids; OUTPUT MUST BE OUTSIDE EVERY REPO; parent signs/installs separately):
 python pack.py --app-id <10 alnum>.DeviceFacts --package <10 alnum> --out <path outside repo>.wgt
@@ -107,9 +132,11 @@ python pack.py --app-id <10 alnum>.DeviceFacts --package <10 alnum> --out <path 
 
 For a live run the parent (who holds credentials and the signing identity) must allow:
 
-- the widget's own private store write `wgt-private/device-facts.json` (covered by the
-  `filesystem.write` privilege in the config template);
+- the widget's own private store at `wgt-private/device-facts.json` (covered by the
+  `filesystem.read` and `filesystem.write` privileges in the config template; read is needed for the
+  read-write resolve of the app's own store);
 - the `productinfo` privilege (already in the template);
+- the on-device `$WEBAPIS/webapis/webapis.js` loader path (standard Samsung SDK path; no network);
 - the packager output path **outside every git checkout/worktree** (the packager enforces this).
 
 No new allowlist entry is needed for `tools/tv-inspect` or the capture engine; they are untouched.

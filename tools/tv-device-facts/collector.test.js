@@ -75,7 +75,6 @@ function fakeSystemInfo(value) {
 function baseDeps(productinfo, extra) {
   const writes = [];
   const shown = [];
-  let exits = 0;
   const deps = Object.assign(
     {
       productinfo,
@@ -88,22 +87,19 @@ function baseDeps(productinfo, extra) {
         return Promise.resolve();
       },
       showSummary: (s) => shown.push(s),
-      scheduleExit: () => {
-        exits += 1;
-      },
     },
     extra || {}
   );
-  return { deps, writes, shown, exitCount: () => exits };
+  return { deps, writes, shown };
 }
 
 function expectedDigest(duid) {
   return crypto.createHash("sha256").update(C.IDENTITY_DOMAIN + duid, "utf8").digest("hex");
 }
 
-test("complete capture: exact raw values, correct identity hash, writes, shows, exits", async () => {
+test("complete capture: exact raw values, correct identity hash, writes, shows", async () => {
   const pi = recordingProductInfo();
-  const { deps, writes, shown, exitCount } = baseDeps(pi.proxy);
+  const { deps, writes, shown } = baseDeps(pi.proxy);
   const { result, json } = await C.collect(deps);
 
   assert.equal(result.schema, "quiettv-device-facts/1");
@@ -125,13 +121,13 @@ test("complete capture: exact raw values, correct identity hash, writes, shows, 
   assert.equal(result.identity.scheme, "quiettv-device-facts-duid/sha256/1");
   assert.equal(result.identity.status, "observed");
   assert.equal(result.identity.digest, expectedDigest(SAMPLE.duid));
+  assert.equal(result.identity.digest.length, 64); // 32 bytes
 
   assert.equal(writes.length, 1);
   assert.equal(writes[0].name, "wgt-private/device-facts.json");
   assert.equal(JSON.parse(writes[0].text).schema, "quiettv-device-facts/1");
   assert.equal(writes[0].text, json);
   assert.equal(shown.length, 1);
-  assert.equal(exitCount(), 1);
 });
 
 test("the collector touches only the allowlisted Product API methods, no set*/listener", async () => {
@@ -143,7 +139,6 @@ test("the collector touches only the allowlisted Product API methods, no set*/li
     assert.ok(!/^set/.test(prop), "collector accessed a set* member: " + prop);
     assert.ok(!/listener/i.test(prop), "collector accessed a listener member: " + prop);
   }
-  // Every allowlisted read it needs did happen.
   for (const m of ["getFirmware", "getRealModel", "getModel", "getModelCode", "getSystemConfig", "getLocalSet", "getDuid"]) {
     assert.ok(pi.accessed.includes(m), "expected method not called: " + m);
   }
@@ -157,10 +152,8 @@ test("the raw DUID never appears in the result, json or summary", async () => {
   for (const h of haystacks) {
     assert.ok(!h.includes(SAMPLE.duid), "raw DUID leaked into an output");
   }
-  // The digest IS present (it is a hash, not the raw id) and the summary shows statuses only.
   assert.ok(json.includes(result.identity.digest));
   assert.equal(summary.identity, "observed");
-  // The summary carries only a status string per field, never the value object.
   assert.equal(typeof summary.fields.firmware, "string");
   assert.equal(summary.fields.firmware, "observed");
 });
@@ -194,7 +187,7 @@ test("missing Product API object => every field api-unavailable, incomplete", as
   const { result } = await C.collect(deps);
   for (const k of C.REQUIRED_KEYS) {
     if (k === "platformVersion") {
-      continue; // platform version comes from tizen.systeminfo, present here
+      continue;
     }
     assert.equal(result.fields[k].status, "api-unavailable", k);
   }
@@ -211,4 +204,110 @@ test("an empty or non-string field is coded, never filled with a default", async
   assert.ok(!("value" in result.fields.model));
   assert.ok(!("value" in result.fields.modelCode));
   assert.equal(result.status, "incomplete");
+});
+
+// ---- regression: review round 1 -----------------------------------------------------------
+
+test("REGRESSION: all getters 'Unknown' => placeholder, never observed/complete", async () => {
+  // Parent reproducer: every string (and the platform capability) is the literal placeholder
+  // 'Unknown'; the DUID is a valid synthetic value and real WebCrypto hashes it. The result must
+  // be incomplete and no field may be 'observed'.
+  const pi = recordingProductInfo({
+    getFirmware: () => "Unknown",
+    getRealModel: () => "Unknown",
+    getModel: () => "Unknown",
+    getModelCode: () => "Unknown",
+    getSystemConfig: () => "Unknown",
+    getLocalSet: () => "Unknown",
+  });
+  const { deps } = baseDeps(pi.proxy, { systeminfo: fakeSystemInfo("Unknown") });
+  const { result } = await C.collect(deps);
+  for (const k of Object.keys(result.fields)) {
+    assert.equal(result.fields[k].status, "placeholder", k + " not refused as placeholder");
+    assert.ok(!("value" in result.fields[k]), k + " kept a placeholder value");
+  }
+  assert.equal(result.identity.status, "observed"); // valid DUID + real crypto
+  assert.equal(result.status, "incomplete");
+});
+
+test("REGRESSION: whitespace-only, control chars and overlong strings are refused", async () => {
+  const over = "x".repeat(C.MAX_FIELD_CHARS + 1);
+  const pi = recordingProductInfo({
+    getFirmware: () => "   ",
+    getRealModel: () => "ok\u0001bad",
+    getModel: () => over,
+  });
+  const { deps } = baseDeps(pi.proxy);
+  const { result } = await C.collect(deps);
+  assert.equal(result.fields.firmware.status, "empty");
+  assert.equal(result.fields.realModel.status, "unsafe");
+  assert.equal(result.fields.model.status, "too-long");
+  for (const k of ["firmware", "realModel", "model"]) {
+    assert.ok(!("value" in result.fields[k]), k + " kept an invalid value");
+  }
+  assert.equal(result.status, "incomplete");
+});
+
+test("REGRESSION: a value at the length bound is observed and kept exactly (no trim)", async () => {
+  const atBound = "A".repeat(C.MAX_FIELD_CHARS);
+  const exact = "T-X22UDFAKUC-0090-REL-202607141244"; // internal punctuation preserved
+  const pi = recordingProductInfo({ getModel: () => atBound, getFirmware: () => exact });
+  const { deps } = baseDeps(pi.proxy);
+  const { result } = await C.collect(deps);
+  assert.equal(result.fields.model.status, "observed");
+  assert.equal(result.fields.model.value, atBound);
+  assert.equal(result.fields.firmware.value, exact);
+});
+
+test("REGRESSION: a synchronous subtle.digest throw is caught as hash-threw", async () => {
+  // Parent reproducer: digest throws synchronously, which previously escaped the whole collect().
+  const pi = recordingProductInfo();
+  const { deps } = baseDeps(pi.proxy, {
+    subtle: {
+      digest() {
+        throw new Error("synthetic crypto failure");
+      },
+    },
+  });
+  const { result } = await C.collect(deps); // must NOT throw
+  assert.equal(result.identity.status, "hash-threw");
+  assert.ok(!("digest" in result.identity));
+  assert.equal(result.status, "incomplete");
+  assert.ok(!JSON.stringify(result).includes(SAMPLE.duid), "raw DUID leaked on a hash failure");
+});
+
+test("REGRESSION: a malformed (wrong-length) digest result is refused", async () => {
+  const pi = recordingProductInfo();
+  const { deps } = baseDeps(pi.proxy, {
+    subtle: {
+      digest() {
+        return Promise.resolve(new ArrayBuffer(16)); // not 32 bytes
+      },
+    },
+  });
+  const { result } = await C.collect(deps);
+  assert.equal(result.identity.status, "hash-invalid");
+  assert.ok(!("digest" in result.identity));
+  assert.equal(result.status, "incomplete");
+});
+
+test("REGRESSION: an invalid DUID (placeholder/overlong/control) is coded, not hashed", async () => {
+  for (const [duid, code] of [
+    ["Unknown", "duid-placeholder"],
+    ["   ", "duid-empty"],
+    ["x".repeat(C.MAX_FIELD_CHARS + 1), "duid-too-long"],
+    ["bad\u0002duid", "duid-unsafe"],
+  ]) {
+    const pi = recordingProductInfo({ getDuid: () => duid });
+    const { deps } = baseDeps(pi.proxy);
+    const { result, json } = await C.collect(deps);
+    assert.equal(result.identity.status, code, "DUID '" + code + "' not coded");
+    assert.ok(!("digest" in result.identity));
+    assert.equal(result.status, "incomplete");
+    // A whitespace-only value trivially matches indented JSON, so the leak check is only
+    // meaningful for a distinctive (non-whitespace) value.
+    if (duid.trim().length > 0) {
+      assert.ok(!json.includes(duid), "raw invalid DUID leaked");
+    }
+  }
 });
