@@ -139,9 +139,10 @@ secrets live in this repository.
 
 ## Remaining setup wiring (stated honestly)
 
-The library boundary is sufficient and is all this slice ships. `factsjoin` is
-**not** wired into the live Helper (`helper/session.py`, which reads only the
-TV's network info page and cannot see these facts) or the CLI; `preflight_display`
-is a pure offline seam a future setup screen may consume when clean. Wiring a
-setup/CLI preflight path, and supplying real per-TV policies, are separate
-reviewed steps and are out of scope here.
+The library boundary is sufficient and is all this slice ships. The Helper now
+offers an **optional, owner-configured offline preflight** that consumes
+`preflight_display`: started with `--preflight-config <FILE>`, it reads four
+local files named at startup and shows the derived facts (see `helper/README.md`).
+It reads no TV and no network and enables nothing. Live acquisition of these
+facts, and the CLI/engine setup that would install anything, remain unfinished
+and out of scope here; supplying real per-TV policies is a separate reviewed step.

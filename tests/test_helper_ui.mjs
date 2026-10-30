@@ -317,6 +317,16 @@ test("preflight unconfigured: a startup hint, the button hidden, no fake success
   assert.equal(h.getEl("preflight-msg").textContent, "");
 });
 
+test("preflight running: the button is disabled and a checking message shows", async () => {
+  const h = harness("#t=" + TOKEN, () => ({ status: 200,
+    data: state({ preflight: { configured: true, status: "running", error: null, result: null } }) }));
+  h.ready();
+  await flush();
+  assert.equal(h.getEl("preflight-btn").disabled, true);           // no second run while one is in flight
+  assert.equal(h.getEl("preflight-result").hidden, true);          // nothing claimed mid-run
+  assert.ok(h.getEl("preflight-msg").textContent.includes("Checking"));
+});
+
 test("preflight button posts an empty body to /api/preflight", async () => {
   const seq = [preflightState({ status: "idle", result: null }), preflightState()];
   let i = 0;

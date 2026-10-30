@@ -13,6 +13,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -431,6 +432,69 @@ class LeakDetectorPositiveControlTests(PreflightServerCase):
             self._assert_no_leak()
 
 
+class ReadErrorPreflightTests(PreflightServerCase):
+    MARKER = "SYNTHETIC-SEKRIT-READ-FAILURE"
+
+    def test_read_error_is_sanitized_then_a_later_retry_succeeds(self):
+        # A read failure after the file opened (here os.read raising) must become a fixed-reason
+        # refusal, never an escaped OSError whose message could carry a path. The fd must still
+        # close, so a later unpatched run works. The error message carries a secret marker that
+        # must not reach the HTTP body or stderr.
+        with mock.patch.object(hs.os, "read", side_effect=OSError(self.MARKER)):
+            status, st = self.preflight()
+        self.assertEqual(status, 200)
+        self.assertEqual(st["preflight"]["status"], "error")
+        self.assertEqual(st["preflight"]["error"]["code"], "source-unreadable")
+        self.assertNotIn(self.MARKER, json.dumps(st))
+        self.assertNotIn(self.MARKER, self.stderr.getvalue())
+        # The fds closed and nothing is stuck: a later run against the same files succeeds.
+        self.assertEqual(self.preflight()[1]["preflight"]["status"], "success")
+
+
+class PreflightConcurrencyTests(PreflightServerCase):
+    def test_pending_state_duplicate_refusal_and_completion_reset(self):
+        session = self.app.session
+        started, release = threading.Event(), threading.Event()
+        real_compute = session._compute_preflight
+
+        def blocking(config):
+            started.set()
+            release.wait(5)   # hold the run in flight so another request sees "running"
+            return real_compute(config)
+
+        worker = threading.Thread(target=self.preflight, name="slow-preflight")
+        with mock.patch.object(session, "_compute_preflight", blocking):
+            worker.start()
+            self.assertTrue(started.wait(5))
+            # Real GET shows the pending state while the compute is in flight.
+            self.assertEqual(self.call("GET", "/api/state")[1]["preflight"]["status"], "running")
+            # A second POST is refused with a 409 while one is already running.
+            status, out = self.preflight()
+            self.assertEqual(status, 409)
+            self.assertEqual(out["error"], hs.PREFLIGHT_ERRORS["in-progress"])
+            release.set()
+            worker.join(5)
+        self.assertFalse(worker.is_alive())
+        # Completion: busy cleared, result published, and a fresh run works (not stuck busy).
+        self.assertEqual(self.call("GET", "/api/state")[1]["preflight"]["status"], "success")
+        self.assertEqual(self.preflight()[1]["preflight"]["status"], "success")
+
+    def test_invalidation_during_a_running_check_does_not_republish_or_stick_busy(self):
+        session = self.app.session
+        session.set_target(TARGET)
+        real_compute = session._compute_preflight
+
+        def compute_then_change(config):
+            result = real_compute(config)
+            session.set_target(OTHER)  # bump the generation mid-run (as a target change would)
+            return result
+        with mock.patch.object(session, "_compute_preflight", compute_then_change):
+            _, st = self.preflight()
+        self.assertEqual(st["preflight"]["status"], "idle")   # invalidated run is not republished
+        self.assertFalse(session._preflight_busy)             # and the busy flag is cleared
+        self.assertEqual(self.preflight()[1]["preflight"]["status"], "success")  # a later run still works
+
+
 class OversizeSourcePreflightTests(PreflightServerCase):
     def source_overrides(self):
         # A profile that is valid JSON but padded past the read bound (leading whitespace is ignored by JSON).
@@ -520,17 +584,23 @@ class MainStartupTests(unittest.TestCase):
     def test_main_refuses_a_bad_preflight_config_without_binding(self):
         bad = Path(self.tmp) / "bad.json"
         bad.write_text("{ not json", encoding="utf-8")
-        unc = write_config(self.tmp, write_sources(self.tmp), extra={"productInfoReport": r"\\host\share\r.json"})
+        srcs = write_sources(self.tmp)
+        unc = write_config(self.tmp, srcs, extra={"productInfoReport": r"\\host\share\r.json"})
+        # A NUL in a source path makes every os path call raise ValueError, which main would not
+        # catch -> traceback. It must be refused finitely instead, like any other bad config.
+        nul = write_config(self.tmp, srcs, extra={"productInfoReport": srcs["report"] + "\x00evil"})
         # Each case: refused, the server never built (so nothing binds), no source path in stdio.
         for label, path, leak in (("malformed", str(bad), str(bad)),
-                                   ("unc-source", unc, r"\\host\share\r.json")):
+                                   ("unc-source", unc, r"\\host\share\r.json"),
+                                   ("nul-source", nul, srcs["report"])):
             with self.subTest(case=label):
                 rc, out, err, served, app_ctor = self._run_main(path)
                 self.assertEqual(rc, 2)
                 app_ctor.assert_not_called()  # the server is never built, so nothing binds
                 self.assertEqual(served, [])
                 self.assertIn("preflight config refused", err)
-                self.assertNotIn(leak, out + err)  # the refusal names no path, on either stream
+                self.assertNotIn("Traceback", out + err)  # a finite refusal, never an escaped stack
+                self.assertNotIn(leak, out + err)         # the refusal names no path, on either stream
 
     def test_main_accepts_a_valid_preflight_config(self):
         srcs = write_sources(self.tmp)

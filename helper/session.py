@@ -459,6 +459,7 @@ PREFLIGHT_ERRORS = {
     "source-too-large": "One of the configured saved report files is too large to be a saved report.",
     "verify-failed": "QuietTV could not verify the saved reports against the trusted policy and "
                      "profile. Check they are the report, frame, policy and profile for this exact TV.",
+    "in-progress": "A saved-report preflight is already running. Wait for it to finish.",
     "internal": "The saved-report preflight could not be completed.",
 }
 
@@ -500,6 +501,8 @@ def _path_is_local_and_plain(value: str, key: str) -> str:
     """
     if type(value) is not str or not value:
         raise PreflightConfigError(f"preflight config {key} must be a non-empty path string")
+    if "\x00" in value:  # an embedded NUL makes every os path call raise ValueError, not OSError
+        raise PreflightConfigError(f"preflight config {key} is not a valid path")
     if "://" in value or value.startswith(("\\\\", "//")):
         raise PreflightConfigError(f"preflight config {key} must be a local file, not a URL or network share")
     try:
@@ -512,7 +515,7 @@ def _path_is_local_and_plain(value: str, key: str) -> str:
         raise PreflightConfigError(f"preflight config {key} must not contain '..'")
     try:
         real = os.path.realpath(value)
-    except OSError:
+    except (ValueError, OSError):
         raise PreflightConfigError(f"preflight config {key} could not be resolved") from None
     if real.startswith(("\\\\", "//")):
         raise PreflightConfigError(f"preflight config {key} resolves to a network share, which is not allowed")
@@ -522,7 +525,7 @@ def _path_is_local_and_plain(value: str, key: str) -> str:
             info = os.lstat(component)
         except FileNotFoundError:
             continue  # a not-yet-existing parent cannot be a link; the leaf's own existence is checked on read
-        except OSError:
+        except (ValueError, OSError):
             raise PreflightConfigError(f"preflight config {key} could not be inspected") from None
         if _is_link_or_reparse(info):
             raise PreflightConfigError(f"preflight config {key} crosses a symlink, junction or reparse point")
@@ -537,7 +540,7 @@ def _read_local_file(path: str, max_bytes: int) -> bytes:
     """
     try:
         base = os.lstat(path)
-    except OSError:
+    except (ValueError, OSError):
         raise _PreflightSourceError("source-unreadable") from None
     if _is_link_or_reparse(base) or not stat.S_ISREG(base.st_mode):
         raise _PreflightSourceError("source-unreadable")
@@ -545,13 +548,13 @@ def _read_local_file(path: str, max_bytes: int) -> bytes:
     for component in Path(path).parents:
         try:
             info = os.lstat(component)
-        except OSError:
+        except (ValueError, OSError):
             raise _PreflightSourceError("source-unreadable") from None
         if _is_link_or_reparse(info):
             raise _PreflightSourceError("source-unreadable")
     try:
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
-    except OSError:
+    except (ValueError, OSError):
         raise _PreflightSourceError("source-unreadable") from None
     try:
         opened = os.fstat(fd)
@@ -571,6 +574,10 @@ def _read_local_file(path: str, max_bytes: int) -> bytes:
             if total > max_bytes:
                 raise _PreflightSourceError("source-too-large")
             chunks.append(chunk)
+    except OSError:
+        # A read/stat failure after opening (patched os.read, a device error) is a fixed-reason
+        # refusal, not an escaped OSError whose message could carry a path. The fd still closes below.
+        raise _PreflightSourceError("source-unreadable") from None
     finally:
         os.close(fd)
     return b"".join(chunks)
@@ -657,6 +664,7 @@ class Session:
         self._check: dict | None = None
         self._preflight: dict | None = None   # last run result/error, or None (idle)
         self._preflight_gen = 0               # bumped when a target change or live check invalidates it
+        self._preflight_busy = False          # a preflight compute is in flight (one at a time)
 
     # -- target and jobs --
 
@@ -795,18 +803,31 @@ class Session:
         """Run the offline saved-report preflight against the configured sources. Never reads a TV.
 
         The file reads and the factsjoin call run OUTSIDE the lock; the result is stored only if
-        no target change or live check invalidated it meanwhile (generation guard).
+        no target change or live check invalidated it meanwhile (generation guard). Only one
+        preflight runs at a time: a second concurrent request is refused with a 409. While a run
+        is in flight the state reports status "running"; the finally clause always clears the
+        busy flag, so an invalidated or failed run never leaves the preflight stuck "running".
         """
         with self._lock:
             config = self._preflight_config
             if config is None:
                 raise SessionError(PREFLIGHT_ERRORS["not-configured"], 409)
+            if self._preflight_busy:
+                raise SessionError(PREFLIGHT_ERRORS["in-progress"], 409)
+            self._preflight_busy = True
             gen = self._preflight_gen
-        result = self._compute_preflight(config)
-        with self._lock:
-            if gen == self._preflight_gen:  # not invalidated while we were reading/joining
-                self._preflight = result
-            return self._state_locked()
+        result = None
+        try:
+            result = self._compute_preflight(config)
+        finally:
+            with self._lock:
+                self._preflight_busy = False
+                # Store only a run that completed and was not invalidated meanwhile: an invalidated
+                # run must not republish over the None that _invalidate_preflight_locked left behind.
+                if result is not None and gen == self._preflight_gen:
+                    self._preflight = result
+                state = self._state_locked()
+        return state
 
     def _compute_preflight(self, config: PreflightConfig) -> dict:
         """Read the four saved files and derive the display-safe result or a fixed-reason error.
@@ -866,6 +887,8 @@ class Session:
     def _preflight_view_locked(self) -> dict:
         if self._preflight_config is None:
             return {"configured": False, "status": "idle", "error": None, "result": None}
+        if self._preflight_busy:  # a compute is in flight: pending, distinct from idle/success/error
+            return {"configured": True, "status": "running", "error": None, "result": None}
         current = self._preflight
         if current is None:
             return {"configured": True, "status": "idle", "error": None, "result": None}

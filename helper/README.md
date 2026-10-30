@@ -42,6 +42,11 @@ browser window:
 python -B helper/server.py --no-browser --launch-file <OWNER_STORAGE>\quiettv-link.txt
 ```
 
+The private link is written to that new file, which only you can read. The file must not
+already exist and must be outside every git checkout. It is deleted when the Helper stops
+normally (Ctrl+C); a forced kill leaves it behind, so delete it yourself in that case.
+Without `--launch-file`, `--no-browser` gives no way in, because the link is never printed.
+
 To offer the advanced saved-report preflight as well:
 
 ```
@@ -53,7 +58,8 @@ python -B helper/server.py --preflight-config <OWNER_STORAGE>\quiettv-preflight.
 **Interface, and why it is shaped this way.** The preflight sources are named **once, at
 startup, in a single strict-JSON config file** given with `--preflight-config`. No HTTP route
 ever accepts a file path, a URL, a policy or a profile, or a device identity: the browser can
-only press a body-less *Check saved reports* button (`POST /api/preflight` with `{}`), which
+only press a *Check saved reports* button that sends an empty-object request (`POST
+/api/preflight` with `{}`), which
 runs the check against the already-configured sources. This keeps the browser surface exactly
 as small as the live check's — nothing the page sends chooses what is read. A new owner
 config file (not an HTTP field) is the only way to point the preflight at different files, by
@@ -98,11 +104,6 @@ profile id, the identity scheme name (never the digest or the opaque device-id t
 fixed note. It carries no capability, no enabled action and no device-id token. Changing the
 TV address or starting a live TV check clears any shown preflight result, so a saved-report
 match is never mistaken for live reachability.
-
-The private link is written to that new file, which only you can read. The file must not
-already exist and must be outside every git checkout. It is deleted when the Helper stops
-normally (Ctrl+C); a forced kill leaves it behind, so delete it yourself in that case.
-Without `--launch-file`, `--no-browser` gives no way in, because the link is never printed.
 
 Packaging target: the python.org embeddable runtime. No npm, Electron or global tools.
 

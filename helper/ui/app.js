@@ -208,9 +208,13 @@
     var hint = $("preflight-hint");
     $("preflight-actions").hidden = !pf.configured;
     hint.hidden = pf.configured;
+    var running = pf.configured && pf.status === "running";
+    $("preflight-btn").disabled = running;  // one preflight at a time: no second click while running
     if (!pf.configured) {
       hint.textContent = "Not configured. Start QuietTV Helper with --preflight-config <file> to check saved reports.";
       say("preflight-msg", "");
+    } else if (running) {
+      say("preflight-msg", "Checking saved reports...");
     } else if (pf.status === "success") {
       say("preflight-msg", "Saved report check complete.");
     } else if (pf.status === "error" && pf.error) {
@@ -296,11 +300,16 @@
   // The only caller of /api/preflight. The body is always the empty object: the sources are
   // fixed at startup, never chosen here.
   function onPreflight() {
+    $("preflight-btn").disabled = true;  // disable at once; render() re-enables from the final state
     say("preflight-msg", "Checking saved reports...");
     api("POST", "/api/preflight", {}).then(function (res) {
       if (!handle(res)) return;
-      if (!res.ok && res.data && res.data.error) say("preflight-msg", res.data.error, true);
+      if (!res.ok && res.data && res.data.error) {
+        $("preflight-btn").disabled = false;  // a refused request (e.g. 409 already running) leaves no new state
+        say("preflight-msg", res.data.error, true);
+      }
     }).catch(function () {
+      $("preflight-btn").disabled = false;
       say("preflight-msg", "QuietTV Helper stopped. Start it again to continue.", true);
     });
   }
