@@ -6,9 +6,18 @@ owner to retrieve with the Tizen SDK. It is the first bounded slice toward an ob
 model/firmware/region/identity collector.
 
 It is **not** the read-only inventory tool (`tools/tv-inspect`) and does **not** change it, its
-`frame.py` decoder, or the `quiettv-inspection/1` contract. It is also **not** a pure no-write tool:
-it writes **one** file, its own `wgt-private/device-facts.json`. Nothing else is written, and no TV,
-network, certificate or private file is touched by anything in this folder.
+`frame.py` decoder, or the `quiettv-inspection/1` contract.
+
+There are two distinct contexts, and only one of them is a no-TV context:
+
+- **On the PC** (packaging and the tests in this folder): fully offline. The packager and the
+  `node --test` / `python -m unittest` suites touch no TV, no network, no certificate and no private
+  file. They run against synthetic fixtures only.
+- **On the TV** (the widget at runtime, once the parent signs and installs it): the widget reads the
+  device's own facts through the Samsung Product API and writes **one** file, its own
+  `wgt-private/device-facts.json`. It opens no network, reads no certificate and touches no path
+  outside its own private store, but it is a device-side program that reads the device and writes a
+  file — it is not a pure no-write tool.
 
 The parent alone signs, installs, runs and removes the widget and retrieves the result. This slice
 ships only the sources, an unsigned config template, and a deterministic packager — no signing and
@@ -23,7 +32,9 @@ Privilege required: `http://developer.samsung.com/privilege/productinfo` (public
 Plus `http://tizen.org/privilege/filesystem.read` and `http://tizen.org/privilege/filesystem.write`
 for the one private-file write: the widget resolves its **own** `wgt-private` store in read-write
 mode and resolves the leaf file before (re)writing it, which needs the read privilege as well as
-write. These privileges reach only the app's own private storage; no other path is accessed.
+write. The **code** here accesses only the app's own private path; the `filesystem.*` privileges
+themselves are not an OS-level private-only fence — they grant broader filesystem access, and it is
+this widget's own logic, not the privilege, that confines it to its private store.
 
 The Samsung Web API loader `<script src="$WEBAPIS/webapis/webapis.js">` is included in `index.html`
 before `collector.js`, per the official Samsung reference
@@ -141,12 +152,54 @@ For a live run the parent (who holds credentials and the signing identity) must 
 
 No new allowlist entry is needed for `tools/tv-inspect` or the capture engine; they are untouched.
 
+## Tested once on real hardware (reference values)
+
+The signed widget was installed, launched and read back once on a single Samsung TV. The private
+`device-facts.json` was retrieved through the SDK over the owner's own channel (no root read), the
+result was `complete` with every field `observed`, and the package was then uninstalled and the
+upload removed, leaving boot, native and all immutable file hashes unchanged. The observed API
+values were:
+
+| field | value |
+|---|---|
+| `getFirmware()` | `T-X22UDFAKUC-0090-1300.8` |
+| `getRealModel()` | `UN43U8000FBXZA` |
+| `getModel()` | `U8000F_X22` |
+| `getModelCode()` | `25_X22U_UHD` |
+| `getSystemConfig(CONFIG_KEY_SERVICE_COUNTRY)` | `US` |
+| `getLocalSet()` | `US` |
+| `platform.version` capability | `9.0` |
+
+The device identity (DUID hash) was `observed`; the raw DUID and its hash are the owner's and are
+**not** recorded here or published.
+
+The `platform.version` capability (`9.0`) is the **Tizen platform capability**, which is **not** the
+same thing as the native release file's `VERSION` (`9.0.0`) or its `BUILD_ID`, and is not the
+Samsung firmware revision. These are kept distinct on purpose and must not be silently equated.
+
+This was a **one-off SDK read over the owner's own channel**, not a finished product. There is no
+general, publicly completed stock-TV retrieval or setup path, and nothing here should be presented
+as a universal "install and read any TV" flow.
+
+## Limitations (what this slice does NOT do)
+
+- No general firmware **split** into firmware + build/revision (deferred until a second device shows
+  the format is stable).
+- No join of these facts to a profile/capsule identity — the identity scheme is deliberately
+  distinct from `tvkit-device-id/1` and no adapter is shipped.
+- No native bridge, no installer, no restore/recovery integration.
+- No universal SDK-retrieval or device-setup tooling; the one read above used the parent's existing
+  signing and channel.
+- DUID reset semantics are unchanged from the Samsung FAQ (a factory reset changes the DUID; a
+  SmartHub reset does not); no cross-reset or cross-firmware identity stability is claimed.
+
 ## Unresolved (await live result before the general adapter)
 
 - `/etc/info.ini` is generic (`Model=Tizen9/TV`, `Build=latest`) and unusable for SKU/firmware;
   `/etc/tizen-release` gives the OS version and a BUILD_ID that is **not** the Samsung firmware
-  revision. The network API returned `firmwareVersion` literally `Unknown`. So the Product API is
-  the authoritative route, and its real values are not yet observed from this TV.
-- Whether `getFirmware()` needs splitting into firmware + firmwareBuild is **deferred** until the
-  parent sees the real returned format.
+  revision. The network API returned `firmwareVersion` literally `Unknown`. The Product API is the
+  authoritative route, and its real values are now observed once (see "Tested once on real
+  hardware" above); whether they are stable across models/firmware is still open.
+- Whether `getFirmware()` needs splitting into firmware + firmwareBuild is **deferred** until a
+  second device confirms the returned format (`T-X22UDFAKUC-0090-1300.8` so far).
 - No production `tvkit-profile/2` exists yet; no field here enables profile matching or install.
