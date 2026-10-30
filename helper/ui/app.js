@@ -17,6 +17,13 @@
     cleanup: "Remove Samsung apps you do not want, such as ads and tracking. Each one can be put back.",
     restore: "Put back apps QuietTV removed, or undo everything QuietTV changed."
   };
+  // Plain-language names for the fixed factsjoin field sources; an unknown source is shown verbatim.
+  var SOURCE_LABELS = {
+    "observed:productInfo.realModel": "read from the saved ProductInfo report",
+    "observed:productInfo.firmware": "read from the saved ProductInfo report",
+    "observed:native.machine": "read from the saved native inventory",
+    "interpreted": "interpreted by your trusted policy"
+  };
   var token = null;
   var state = null;
   var pollTimer = null;
@@ -193,9 +200,50 @@
     return lines.join("\n");
   }
 
+  function renderPreflight() {
+    var pf = state.preflight;
+    var card = $("preflight-card");
+    if (!pf) { card.hidden = true; return; }
+    card.hidden = false;
+    var hint = $("preflight-hint");
+    $("preflight-actions").hidden = !pf.configured;
+    hint.hidden = pf.configured;
+    if (!pf.configured) {
+      hint.textContent = "Not configured. Start QuietTV Helper with --preflight-config <file> to check saved reports.";
+      say("preflight-msg", "");
+    } else if (pf.status === "success") {
+      say("preflight-msg", "Saved report check complete.");
+    } else if (pf.status === "error" && pf.error) {
+      say("preflight-msg", pf.error.message, true);
+    } else {
+      say("preflight-msg", "");
+    }
+
+    var result = pf.configured && pf.status === "success" ? pf.result : null;
+    $("preflight-result").hidden = !result;
+    if (result) {
+      var facts = $("preflight-facts");
+      clear(facts);
+      result.fields.forEach(function (f) {
+        facts.appendChild(el("dt", null, f.label));
+        var dd = el("dd");
+        dd.appendChild(el("span", null, f.value));          // value as literal text
+        dd.appendChild(el("span", "src", " — " + (SOURCE_LABELS[f.source] || f.source)));
+        facts.appendChild(dd);
+      });
+      $("preflight-note").textContent = result.note;
+      $("preflight-provenance").textContent =
+        "Source: saved report files you configured, not a live connection. Profile " + result.profileId +
+        "; identity scheme " + result.identityScheme + ". You asserted that you trust this policy and " +
+        "profile and that both saved reports came from the same TV. This does not verify your current TV " +
+        "and enables nothing.";
+    }
+  }
+
   function render() {
     if (!state) return;
     renderCheck();
+    renderPreflight();
     Object.keys(state.actions).forEach(renderAction);
     $("report-text").textContent = reportText();
   }
@@ -245,6 +293,18 @@
     api("POST", "/api/cancel", { jobId: state.job.id }).then(handle).then(schedulePoll);
   }
 
+  // The only caller of /api/preflight. The body is always the empty object: the sources are
+  // fixed at startup, never chosen here.
+  function onPreflight() {
+    say("preflight-msg", "Checking saved reports...");
+    api("POST", "/api/preflight", {}).then(function (res) {
+      if (!handle(res)) return;
+      if (!res.ok && res.data && res.data.error) say("preflight-msg", res.data.error, true);
+    }).catch(function () {
+      say("preflight-msg", "QuietTV Helper stopped. Start it again to continue.", true);
+    });
+  }
+
   function onCopy() {
     var text = $("report-text").textContent;
     if (!navigator.clipboard) { say("copy-msg", "Select the text and copy it.", true); return; }
@@ -271,6 +331,7 @@
     });
     $("check-form").addEventListener("submit", onCheck);
     $("cancel-btn").addEventListener("click", onCancel);
+    $("preflight-btn").addEventListener("click", onPreflight);
     $("copy-btn").addEventListener("click", onCopy);
     if (!token) { $("session-banner").hidden = false; return; }
     refresh();  // local state only; this never contacts the TV

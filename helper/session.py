@@ -9,6 +9,13 @@ What it does:
     shutdown()       cancel and join the reader thread (the server calls this when it stops)
     state()          what the UI shows: reachability, model support, exact-match gaps, gates
     refuse_action()  every change action (backup, launcher, cleanup, restore) is refused here
+    run_preflight()  OPTIONAL, only when the Helper was started with --preflight-config: an
+                     offline check of four owner-named saved files (ProductInfo report, native
+                     inspection frame, trusted join policy, profile) through tvkit.factsjoin,
+                     showing the seven profile/2 facts it derives. It is display-only: it reads
+                     no TV, enables nothing, never marks the live target verified, and every
+                     change action still refuses. Changing the target or starting a live check
+                     clears a shown preflight result.
 
 Every read has one hard 6-second deadline covering connect, request, headers and body.
 
@@ -28,12 +35,15 @@ sys.dont_write_bytecode = True  # importing tvkit must never create files under 
 
 import errno
 import ipaddress
+import os
 import re
 import secrets
 import select
 import socket
+import stat
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -414,6 +424,203 @@ def compatibility(facts: dict) -> dict:
     }
 
 
+# ---- optional saved-report preflight (display only; owner-configured at startup) ----
+#
+# The four sources are named ONCE, in a strict-JSON config file given on the command line with
+# --preflight-config. No HTTP route ever takes a path, URL, policy, profile or identity: the
+# browser can only press a body-less button that runs the check against the configured sources.
+# The check is the existing offline tvkit.factsjoin library; nothing here reads a TV, a network
+# or a receipt supplied from outside, and the result enables nothing.
+
+PREFLIGHT_CONFIG_SCHEMA = "quiettv-helper-preflight/1"
+PREFLIGHT_DISPLAY_SCHEMA = "tvkit-facts-join-preflight/1"  # factsjoin.PREFLIGHT_SCHEMA; checked, never trusted blindly
+# role -> (config key, read limit in bytes). report/policy/profile are small; the framed native
+# inventory is larger, then the inspection decoder enforces its own limits.
+PREFLIGHT_SOURCES = (
+    ("productInfoReport", 256 * 1024),
+    ("nativeInspectionFrame", 4 * 1024 * 1024),
+    ("joinPolicy", 256 * 1024),
+    ("profile", 256 * 1024),
+)
+MAX_PREFLIGHT_CONFIG_BYTES = 64 * 1024
+_REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT (symlinks, junctions, OneDrive placeholders)
+
+
+def _is_link_or_reparse(info: os.stat_result) -> bool:
+    """True for a symlink, junction or any other reparse point. Single gate so tests can both-way it."""
+    return stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & _REPARSE_POINT)
+
+# Fixed, non-sensitive reasons. A refusal never echoes a source value, a path, a digest or a token.
+PREFLIGHT_ERRORS = {
+    "not-configured": "Saved-report preflight is not configured. Start QuietTV Helper with "
+                      "--preflight-config to use it.",
+    "source-unreadable": "QuietTV could not read one of the configured saved report files. Check "
+                         "each one is still a plain local file.",
+    "source-too-large": "One of the configured saved report files is too large to be a saved report.",
+    "verify-failed": "QuietTV could not verify the saved reports against the trusted policy and "
+                     "profile. Check they are the report, frame, policy and profile for this exact TV.",
+    "internal": "The saved-report preflight could not be completed.",
+}
+
+
+class PreflightConfigError(ValueError):
+    """A startup --preflight-config problem. Names the field/key, never a path or file content."""
+
+
+class _PreflightSourceError(Exception):
+    """A per-run source read problem, carrying one PREFLIGHT_ERRORS code."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+@dataclass(frozen=True)
+class PreflightConfig:
+    """Four validated absolute local file paths plus the operator's explicit assertions."""
+
+    product_info_report: str
+    native_inspection_frame: str
+    join_policy: str
+    profile: str
+    trust_policy_and_profile: bool
+    paired_from_same_tv: bool
+
+    def paths(self) -> dict:
+        return {"productInfoReport": self.product_info_report,
+                "nativeInspectionFrame": self.native_inspection_frame,
+                "joinPolicy": self.join_policy, "profile": self.profile}
+
+
+def _path_is_local_and_plain(value: str, key: str) -> str:
+    """Refuse a path that is not an absolute local path without links or reparse points.
+
+    Walks every component (not just the leaf) so a junction in a PARENT folder is caught, and
+    refuses UNC paths, mapped network drives and URLs. Raises PreflightConfigError naming the key.
+    """
+    if type(value) is not str or not value:
+        raise PreflightConfigError(f"preflight config {key} must be a non-empty path string")
+    if "://" in value or value.startswith(("\\\\", "//")):
+        raise PreflightConfigError(f"preflight config {key} must be a local file, not a URL or network share")
+    try:
+        path = Path(value)
+    except (ValueError, OSError):
+        raise PreflightConfigError(f"preflight config {key} is not a valid path") from None
+    if not path.is_absolute():
+        raise PreflightConfigError(f"preflight config {key} must be an absolute path")
+    if ".." in path.parts:
+        raise PreflightConfigError(f"preflight config {key} must not contain '..'")
+    try:
+        real = os.path.realpath(value)
+    except OSError:
+        raise PreflightConfigError(f"preflight config {key} could not be resolved") from None
+    if real.startswith(("\\\\", "//")):
+        raise PreflightConfigError(f"preflight config {key} resolves to a network share, which is not allowed")
+    # Every ancestor and the leaf itself must be a plain, non-reparse entry.
+    for component in (path, *path.parents):
+        try:
+            info = os.lstat(component)
+        except FileNotFoundError:
+            continue  # a not-yet-existing parent cannot be a link; the leaf's own existence is checked on read
+        except OSError:
+            raise PreflightConfigError(f"preflight config {key} could not be inspected") from None
+        if _is_link_or_reparse(info):
+            raise PreflightConfigError(f"preflight config {key} crosses a symlink, junction or reparse point")
+    return os.path.abspath(value)
+
+
+def _read_local_file(path: str, max_bytes: int) -> bytes:
+    """Read a plain local file, bounded, refusing links/reparse (leaf and ancestors) and growth.
+
+    Used at run time (not startup): a link swapped in after startup is caught here too. Raises
+    _PreflightSourceError with a fixed code; never includes the path or content in the error.
+    """
+    try:
+        base = os.lstat(path)
+    except OSError:
+        raise _PreflightSourceError("source-unreadable") from None
+    if _is_link_or_reparse(base) or not stat.S_ISREG(base.st_mode):
+        raise _PreflightSourceError("source-unreadable")
+    # Re-check every ancestor for a reparse point swapped in since startup.
+    for component in Path(path).parents:
+        try:
+            info = os.lstat(component)
+        except OSError:
+            raise _PreflightSourceError("source-unreadable") from None
+        if _is_link_or_reparse(info):
+            raise _PreflightSourceError("source-unreadable")
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+    except OSError:
+        raise _PreflightSourceError("source-unreadable") from None
+    try:
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise _PreflightSourceError("source-unreadable")
+        # The opened fd must be the file lstat saw: no swap between lstat and open.
+        if (opened.st_dev, opened.st_ino) != (base.st_dev, base.st_ino):
+            raise _PreflightSourceError("source-unreadable")
+        if opened.st_size > max_bytes:
+            raise _PreflightSourceError("source-too-large")
+        chunks, total = [], 0
+        while total <= max_bytes:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise _PreflightSourceError("source-too-large")
+            chunks.append(chunk)
+    finally:
+        os.close(fd)
+    return b"".join(chunks)
+
+
+def load_preflight_config(config_path: str) -> PreflightConfig:
+    """Validate a --preflight-config file. Raises PreflightConfigError (never echoes a path)."""
+    plain = _path_is_local_and_plain(config_path, "config")
+    try:
+        raw = _read_local_file(plain, MAX_PREFLIGHT_CONFIG_BYTES)
+    except _PreflightSourceError as exc:
+        raise PreflightConfigError("preflight config " +
+                                   ("is too large" if exc.code == "source-too-large" else "could not be read")) from None
+    try:
+        top = sj.require_object(sj.loads(raw), "preflight config",
+                                ("schema", "productInfoReport", "nativeInspectionFrame",
+                                 "joinPolicy", "profile", "operatorAssertions"))
+    except sj.StrictJsonError:
+        raise PreflightConfigError("preflight config is not well-formed strict JSON") from None
+    if top["schema"] != PREFLIGHT_CONFIG_SCHEMA:
+        raise PreflightConfigError(f"preflight config schema must be {PREFLIGHT_CONFIG_SCHEMA}")
+    resolved = {}
+    for key, _ in PREFLIGHT_SOURCES:
+        if type(top[key]) is not str:
+            raise PreflightConfigError(f"preflight config {key} must be a path string")
+        resolved[key] = _path_is_local_and_plain(top[key], key)
+    # Four distinct files: refuse an ambiguous config that names the same file for two roles.
+    for i, (a, _) in enumerate(PREFLIGHT_SOURCES):
+        for b, _ in PREFLIGHT_SOURCES[i + 1:]:
+            same = resolved[a] == resolved[b]
+            if not same:
+                try:
+                    same = os.path.samefile(resolved[a], resolved[b])
+                except OSError:
+                    same = False
+            if same:
+                raise PreflightConfigError("preflight config names the same file for two sources")
+    try:
+        assertions = sj.require_object(top["operatorAssertions"], "preflight config operatorAssertions",
+                                       ("trustPolicyAndProfile", "pairedFromSameTv"))
+    except sj.StrictJsonError:
+        raise PreflightConfigError("preflight config operatorAssertions is malformed") from None
+    if assertions["trustPolicyAndProfile"] is not True:
+        raise PreflightConfigError("preflight config requires operatorAssertions.trustPolicyAndProfile = true")
+    if assertions["pairedFromSameTv"] is not True:
+        raise PreflightConfigError("preflight config requires operatorAssertions.pairedFromSameTv = true")
+    return PreflightConfig(resolved["productInfoReport"], resolved["nativeInspectionFrame"],
+                           resolved["joinPolicy"], resolved["profile"], True, True)
+
+
 # ---- engine seam ----
 
 class Engine:
@@ -437,15 +644,19 @@ class Session:
     """All Helper state, behind one lock. Safe to call from many server threads."""
 
     def __init__(self, *, reader: Any = None, engine: Engine | None = None,
-                 thread_factory: Callable[..., threading.Thread] = threading.Thread):
+                 thread_factory: Callable[..., threading.Thread] = threading.Thread,
+                 preflight_config: PreflightConfig | None = None):
         self._reader = reader if reader is not None else HttpInfoReader()
         self._engine = engine if engine is not None else Engine()
         self._thread_factory = thread_factory
+        self._preflight_config = preflight_config
         self._lock = threading.Lock()
         self._target: str | None = None
         self._job: _Job | None = None
         self._last_job: dict | None = None
         self._check: dict | None = None
+        self._preflight: dict | None = None   # last run result/error, or None (idle)
+        self._preflight_gen = 0               # bumped when a target change or live check invalidates it
 
     # -- target and jobs --
 
@@ -459,6 +670,7 @@ class Session:
                 raise SessionError("A check is still running for another address. Cancel it first.", 409)
             if ip != self._target:
                 self._target, self._check, self._last_job = ip, None, None
+                self._invalidate_preflight_locked()  # a saved-report result is for no particular target
             return self._state_locked()
 
     def start_check(self, target: Any) -> dict:
@@ -469,6 +681,7 @@ class Session:
                 raise SessionError("This check is locked to the address already entered.", 409)
             if self._busy():
                 raise SessionError("A check is already running.", 409)
+            self._invalidate_preflight_locked()  # a live check supersedes any shown saved-report result
             job = self._job = _Job(self._target)
             self._check = None
             # Started under the lock: no other request can see a "running" job without a worker.
@@ -571,6 +784,92 @@ class Session:
         with self._lock:
             return {"refused": True, "action": action, "changed": False, "gates": self._gates_locked(action)}
 
+    # -- saved-report preflight (display only; enables nothing) --
+
+    def _invalidate_preflight_locked(self) -> None:
+        """Drop any shown saved-report result and bump the generation (caller holds the lock)."""
+        self._preflight = None
+        self._preflight_gen += 1
+
+    def run_preflight(self) -> dict:
+        """Run the offline saved-report preflight against the configured sources. Never reads a TV.
+
+        The file reads and the factsjoin call run OUTSIDE the lock; the result is stored only if
+        no target change or live check invalidated it meanwhile (generation guard).
+        """
+        with self._lock:
+            config = self._preflight_config
+            if config is None:
+                raise SessionError(PREFLIGHT_ERRORS["not-configured"], 409)
+            gen = self._preflight_gen
+        result = self._compute_preflight(config)
+        with self._lock:
+            if gen == self._preflight_gen:  # not invalidated while we were reading/joining
+                self._preflight = result
+            return self._state_locked()
+
+    def _compute_preflight(self, config: PreflightConfig) -> dict:
+        """Read the four saved files and derive the display-safe result or a fixed-reason error.
+
+        Reads no TV and no network. Catches every failure and maps it to a fixed PREFLIGHT_ERRORS
+        code; it never stores or returns the report bytes, the identity, the receipt or a path.
+        """
+        try:
+            limits = dict(PREFLIGHT_SOURCES)
+            report = _read_local_file(config.product_info_report, limits["productInfoReport"])
+            frame = _read_local_file(config.native_inspection_frame, limits["nativeInspectionFrame"])
+            policy_raw = _read_local_file(config.join_policy, limits["joinPolicy"])
+            profile_raw = _read_local_file(config.profile, limits["profile"])
+        except _PreflightSourceError as exc:
+            return self._preflight_error(exc.code)
+        try:
+            from tvkit import factsjoin as fj  # lazy: only pulled in when preflight is actually used
+        except Exception:
+            return self._preflight_error("internal")
+        try:
+            profile = tvprofile.parse_profile(sj.loads(profile_raw))
+            policy = fj.join_policy_from_json(policy_raw)
+            receipt = fj.join(report, frame, policy=policy, profile=profile)
+            shown = fj.preflight_display(receipt, report, frame, policy=policy, profile=profile)
+        except (fj.JoinError, tvprofile.ProfileError, sj.StrictJsonError):
+            return self._preflight_error("verify-failed")
+        except Exception:
+            # Any other failure (a hostile frame, RecursionError, a bad profile object) is still a
+            # refusal, never an escaped exception: do_POST would otherwise send no response.
+            return self._preflight_error("verify-failed")
+        return self._preflight_success(config, shown)
+
+    @staticmethod
+    def _preflight_error(code: str) -> dict:
+        code = code if code in PREFLIGHT_ERRORS else "internal"
+        return {"status": "error", "error": {"code": code, "message": PREFLIGHT_ERRORS[code]}, "result": None}
+
+    @staticmethod
+    def _preflight_success(config: PreflightConfig, shown: dict) -> dict:
+        """Project factsjoin.preflight_display onto the safe view the UI shows. No token/digest/path."""
+        if shown.get("schema") != PREFLIGHT_DISPLAY_SCHEMA:
+            return Session._preflight_error("internal")
+        fields = []
+        for field in tvprofile.MATCH_FIELDS_V2:
+            fields.append({"field": field, "label": FIELD_LABELS.get(field, field),
+                           "value": shown["fields"][field], "source": shown["fieldSources"][field]})
+        return {"status": "success", "error": None, "result": {
+            "profileId": shown["profileId"],
+            "identityScheme": shown["identityScheme"],
+            "fields": fields,
+            "note": shown["note"],
+            "operatorAssertions": {"trustPolicyAndProfile": config.trust_policy_and_profile,
+                                   "pairedFromSameTv": config.paired_from_same_tv},
+        }}
+
+    def _preflight_view_locked(self) -> dict:
+        if self._preflight_config is None:
+            return {"configured": False, "status": "idle", "error": None, "result": None}
+        current = self._preflight
+        if current is None:
+            return {"configured": True, "status": "idle", "error": None, "result": None}
+        return {"configured": True, **current}
+
     # -- views --
 
     def _capabilities_locked(self) -> dict:
@@ -603,6 +902,7 @@ class Session:
             "actions": {name: {"title": spec["title"], "enabled": False, "steps": list(spec["steps"]),
                                "gates": self._gates_locked(name)} for name, spec in ACTIONS.items()},
             "prerequisites": self._prerequisites_locked(),
+            "preflight": self._preflight_view_locked(),
         }
 
     def state(self) -> dict:

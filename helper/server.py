@@ -11,7 +11,9 @@ Security contract (tests/test_helper_server.py checks each line):
                 (never sent to a server) and the page removes it at once
     body        POST only, Content-Length <= 4 KiB, Content-Type application/json, strict JSON
                 (duplicate keys and NaN refused), an object with exactly the route's keys
-    routes      a fixed table; any query string is refused; no file, shell, proxy or upload route
+    routes      a fixed table; any query string is refused; no file, shell, proxy or upload route.
+                /api/preflight takes an empty object only; the saved-report sources are named once
+                at startup by --preflight-config, never over HTTP (no path, policy, profile or id)
     responses   no CORS headers, no-store, nosniff, no-referrer, CSP without inline script/style
     logging     none: no request line, path, header or token is ever written
 
@@ -62,7 +64,10 @@ STATIC = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
 ACTION_ROUTES = {"/api/action/" + name: name for name in hs.ACTIONS}
-POST_KEYS = {"/api/target": ("ip",), "/api/check": ("target",), "/api/cancel": ("jobId",)}
+# /api/preflight takes an empty object only: it never carries a path, policy, profile or identity;
+# the sources are fixed at startup by --preflight-config.
+POST_KEYS = {"/api/target": ("ip",), "/api/check": ("target",), "/api/cancel": ("jobId",),
+             "/api/preflight": ()}
 SECURITY_HEADERS = (
     ("Cache-Control", "no-store"),
     ("X-Content-Type-Options", "nosniff"),
@@ -226,6 +231,8 @@ def _make_handler(app: "HelperApp") -> type:
                     self._json(202, app.session.start_check(body["target"]))
                 elif self.path == "/api/cancel":
                     self._json(200, app.session.cancel(body["jobId"]))
+                elif self.path == "/api/preflight":
+                    self._json(200, app.session.run_preflight())
                 else:
                     self._json(409, app.session.refuse_action(ACTION_ROUTES[self.path], body))
             except _Refused as exc:
@@ -298,6 +305,11 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--launch-file", default=None,
                     help="with --no-browser: write the private sign-in link to this NEW file "
                          "(outside every repository); it is deleted when the Helper stops")
+    ap.add_argument("--preflight-config", default=None,
+                    help="enable the advanced saved-report preflight: a strict-JSON config naming "
+                         "four LOCAL files (ProductInfo report, native inspection frame, trusted "
+                         "join policy, profile) and the operator's trust/pairing assertions. No "
+                         "HTTP route ever accepts a path, policy, profile or identity")
     return ap
 
 
@@ -307,7 +319,16 @@ def main(argv: list | None = None, *, browser_open: Callable[[str], Any] = webbr
     if args.launch_file and not args.no_browser:
         print("QuietTV Helper: --launch-file needs --no-browser", file=sys.stderr)
         return 2
-    app = HelperApp()
+    preflight_config = None
+    if args.preflight_config is not None:
+        # Load and validate the config BEFORE binding a port, so a bad config never starts a server.
+        try:
+            preflight_config = hs.load_preflight_config(args.preflight_config)
+        except (hs.PreflightConfigError, OSError) as exc:
+            message = str(exc) if isinstance(exc, hs.PreflightConfigError) else type(exc).__name__
+            print("QuietTV Helper: preflight config refused: " + message, file=sys.stderr)
+            return 2
+    app = HelperApp(hs.Session(preflight_config=preflight_config))
     launch_file = None
     try:
         if args.launch_file:
