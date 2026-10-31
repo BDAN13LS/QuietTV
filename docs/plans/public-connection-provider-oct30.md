@@ -182,7 +182,7 @@ This is a one-time ADVANCED diagnostic. It does not claim a cold-boot improvemen
 consumer installation, a fresh-stock end-to-end result, or consumer restore/cleanup capability.
 Consumer install, cleanup and restore remain unavailable until independent hardware
 Rescue and full restore are verified. No stock firmware, packages, keys or binaries are
-distributed. After the hardware run, small changes (1 MiB boundary, standard numeric
+distributed. After the hardware run, small changes (1 MB boundary, standard numeric
 RFC 1918 range form, synthetic example addresses, source-guard passwd colon parsing)
 were verified offline; the provider root core is the hardware-tested reference path.
 No TV reboot or startup/launcher change was made for this feature.

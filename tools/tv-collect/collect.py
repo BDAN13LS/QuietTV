@@ -1,11 +1,9 @@
 """Owner-invoked live report collection CLI (thin wrapper over tvkit.livecollect).
 
-This tool NEVER talks to a TV itself and NEVER runs a command. Without
-``--provider-config`` it resolves one adapter name from the toolkit's EMPTY
-reviewed registry and hands it to the public orchestrator. With
-``--provider-config`` it accepts only the one fixed provider name
-``owner-sdk-root`` and loads that reviewed provider from the explicit
-owner-private configuration. With neither it refuses and writes nothing.
+The CLI invokes finite diagnostic collection through a reviewed provider. With
+``--provider-config`` it loads only ``owner-sdk-root`` from the explicit
+owner-private configuration. Without it the default registry is empty and the
+tool refuses unless a trusted parent has registered an adapter.
 
 There is no module-path/plugin loading, no shell/command argument, no SERVER or
 SERIAL input, no network address and no Helper HTTP route.
@@ -44,10 +42,10 @@ from tvkit import provider  # noqa: E402
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="collect.py",
-        description="QuietTV live report collection over an owner-injected trusted adapter. "
-                    "Ships no adapter; refuses without one. No TV, signing or root work here.")
+        description="QuietTV advanced live diagnostic collection through a reviewed provider. "
+                    "Requires an explicitly configured owner-sdk-root or a registered parent adapter.")
     ap.add_argument("--adapter", required=True,
-                    help="name of a registered live-operations adapter (the public registry is empty)")
+                    help="owner-sdk-root with --provider-config, or a registered parent adapter name")
     ap.add_argument("--provider-config",
                     help="explicit owner-private JSON for the fixed owner-sdk-root provider "
                          "(enables only that one name; omit to keep the empty registry refusal)")

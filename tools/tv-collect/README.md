@@ -1,4 +1,4 @@
-# tv-collect — one live ProductInfo + native frame collection
+# tv-collect â€” one live ProductInfo + native frame collection
 
 Owner-invoked PC orchestrator for a **single** live collection over an
 **injected, trusted** TV adapter. It ships one reviewed provider,
@@ -8,9 +8,9 @@ it refuses and writes nothing. This directory itself contains no TV, signing,
 root or network code; the provider drives the owner's pinned SDK and builds its
 root payloads from the checked vendored source.
 
-It produces two fresh same-session observations of one TV — a
+It produces two fresh same-session observations of one TV â€” a
 `quiettv-device-facts/1` ProductInfo report and a `quiettv-inspection/1` native
-frame — joins them through the existing `tvkit.factsjoin` library, and writes a
+frame â€” joins them through the existing `tvkit.factsjoin` library, and writes a
 `quiettv-helper-preflight/1` config that the existing Helper
 (`--preflight-config`) displays offline. Nothing here changes Helper HTTP
 routes, enables an action, or touches Home/boot/startup.
@@ -99,7 +99,7 @@ the absolute trusted `taskkill.exe`.
 The public registry `LIVEOPS` is empty. A parent-owned reviewed adapter:
 
 - binds **one** target per `ops.session(run_id)` and closes only its own
-  resources on exit — never a shared SDK client, server process or host setting;
+  resources on exit â€” never a shared SDK client, server process or host setting;
 - exposes an opaque `session_token` and an opaque in-memory `binding`; every
   result echoes both plus the run id, and the collector refuses mixed values;
 - implements only fixed operations: `assert_absent`, `install_widget`,
@@ -107,7 +107,7 @@ The public registry `LIVEOPS` is empty. A parent-owned reviewed adapter:
   `close_owned_run(id)` and `close()`;
 - receives only tool-computed values (package id, fixed data paths, a random
   run staging directory, exact upload paths and SHA-256 pins) and the
-  **verified bytes** of each artifact — it never re-reads a mutable local path;
+  **verified bytes** of each artifact â€” it never re-reads a mutable local path;
 - pushes and runs the fixed `dotnet <run dir>/QuietTVInspect.dll
   --inventory-framed`, strips **exactly one** transport `[exit:N]` trailer, and
   returns the bounded stdout bytes with the process exit code;
@@ -178,12 +178,12 @@ There is no automatic pre-clean and no nonce.
 
 ## Outputs (owner-private, create-new, no overwrite)
 
-- `device-facts.json` — the exact fresh report bytes
-- `inventory.frame` — the exact fresh framed native bytes
-- `join-receipt.json` — `factsjoin.JoinReceipt.body()`
-- `helper-preflight-config.json` — `quiettv-helper-preflight/1` naming all four
+- `device-facts.json` â€” the exact fresh report bytes
+- `inventory.frame` â€” the exact fresh framed native bytes
+- `join-receipt.json` â€” `factsjoin.JoinReceipt.body()`
+- `helper-preflight-config.json` â€” `quiettv-helper-preflight/1` naming all four
   saved sources and **both** explicit operator assertions
-- `collection.json` — `quiettv-collection/1`: collection id, artifact hashes,
+- `collection.json` â€” `quiettv-collection/1`: collection id, artifact hashes,
   receipt/policy digests, cleanup status
 
 All files are created with create-new semantics and owner-only permissions
@@ -213,13 +213,13 @@ If ownership or cleanup cannot be confirmed, the run writes `collection.json`
 with `"cleanup": {"status": "recovery-needed"}` and a private `namespace` block
 (package id, tool-computed remote run dir, and every expected upload path +
 SHA-256) so the owner can find this run's own partial uploads. It keeps the
-artifacts and refuses — it never reports success after a failed cleanup. When a
+artifacts and refuses â€” it never reports success after a failed cleanup. When a
 primary failure and a cleanup failure coexist, the recovery-required error is
 raised first; the primary failure is recorded only as a finite category.
 
-Every unexpected provider exception — at session open, each operation, close,
+Every unexpected provider exception â€” at session open, each operation, close,
 cleanup or cleanup-result validation, including a `RuntimeError` or a
-provider-raised `LiveCollectionError` with an unsafe message — is converted to
+provider-raised `LiveCollectionError` with an unsafe message â€” is converted to
 a fixed, non-secret `LiveCollectionError` without echoing or chaining provider
 text. The CLI never prints a traceback for those.
 
@@ -311,7 +311,7 @@ improvement or consumer-install claim. Fresh-stock end-to-end verification, cons
 install/cleanup and hardware restore remain unavailable until independent hardware Rescue
 and full restore are verified. No stock firmware, packages, keys or binaries are
 distributed, and no TV reboot or startup/launcher change was made for this feature. After
-the hardware run, small changes (1 MiB boundary, standard numeric RFC 1918 range form,
+the hardware run, small changes (1 MB boundary, standard numeric RFC 1918 range form,
 synthetic example addresses, source-guard passwd colon parsing) were verified offline; the
 provider root core is the hardware-tested reference path.
 

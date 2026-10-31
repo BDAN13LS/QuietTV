@@ -110,12 +110,12 @@ and ownership are profile-specific and must be handled only in that fresh namesp
 - [x] The complete collection took 570.579 s (~9 min 30 s) because of 17 isolated root
   probes. This is a one-time ADVANCED diagnostic, not a cold-boot improvement or a
   consumer-install claim.
-- [x] On Windows, the focused provider and collector suites reported 129 passing tests
-  and 4 POSIX-only skips; the large-frame bounds fix fails on the old code and passes on
+- [x] On Windows, the focused provider and collector suites ran 129 tests with
+  4 POSIX-only skips; the large-frame bounds fix fails on the old code and passes on
   the new code.
 - [x] Root C# DLLs reproduced byte-identically from the two checked source roots, and the
   public builder built and re-checked all five artifacts with SDK 6.0.428.
-- [x] After the hardware run, small changes (1 MiB boundary, standard numeric RFC 1918
+- [x] After the hardware run, small changes (1 MB boundary, standard numeric RFC 1918
   range form, synthetic example addresses, source-guard passwd colon parsing) were
   verified offline. The provider root core is the hardware-tested reference path.
 

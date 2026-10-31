@@ -1,5 +1,16 @@
 # Third-party notices
 
+## Diagnostic connection source
+
+The selected Python and C# files in `public-toolkit/vendor/` come from
+[chris-ritsen/samsung-tv-root, pinned commit 4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b).
+Their upstream Unlicense is retained in
+[public-toolkit/vendor/UPSTREAM-LICENSE](public-toolkit/vendor/UPSTREAM-LICENSE).
+The [vendor notice](public-toolkit/vendor/NOTICE.md) records the selected files and
+local Windows/runtime adaptations. These are buildable sources; this addition
+does not distribute SDK executables, prebuilt root payloads, Samsung firmware,
+stock applications or owner credentials.
+
 ## Native remote input adaptation (source release preparation)
 
 The private native host's Home-key forwarding code was adapted from
@@ -16,7 +27,7 @@ That grant does not relicense anything listed in this file.
 
 ## Frontend runtime packages
 
-Installed runtime packages. Build tools are not shipped in the TV bundle. Native app artwork remains the respective brands’ artwork; IPTV logo and wallpaper were generated for this project.
+Installed runtime packages. Build tools are not shipped in the TV bundle. Native app artwork remains the respective brandsâ€™ artwork; IPTV logo and wallpaper were generated for this project.
 
 ## @noriginmedia/norigin-spatial-navigation 3.3.0
 
@@ -381,4 +392,4 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ## Simple Icons brand marks
 
-Netflix, YouTube and Apple TV glyphs come from https://github.com/simple-icons/simple-icons under CC0-1.0. Original paths are unchanged; a fill color was added. See artwork/brand-provenance.json and artwork/simple-icons-LICENSE.md. Brand names and marks remain the property of their respective owners. Other app PNG artwork was copied from this TV’s installed app catalog.
+Netflix, YouTube and Apple TV glyphs come from https://github.com/simple-icons/simple-icons under CC0-1.0. Original paths are unchanged; a fill color was added. See artwork/brand-provenance.json and artwork/simple-icons-LICENSE.md. Brand names and marks remain the property of their respective owners. Other app PNG artwork was copied from this TVâ€™s installed app catalog.

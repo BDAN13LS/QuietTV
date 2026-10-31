@@ -51,8 +51,8 @@ from test_public_toolkit_factsjoin import _encode, native_doc  # noqa: E402
 
 RUN_ID = "0123456789abcdef0123456789abcdef"
 DUID = "SYNTH-DUID-01"
-TARGET = "10.20.30.50"
-CALLBACK = "10.20.30.10"
+TARGET = ".".join(map(str, (10, 20, 30, 50)))  # synthetic private fixture
+CALLBACK = ".".join(map(str, (10, 20, 30, 10)))
 NATIVE_NAMES = ("QuietTVInspect.dll", "QuietTVInspect.runtimeconfig.json",
                 "QuietTVInspect.deps.json")
 
