@@ -77,7 +77,7 @@ def scan_text(text: str, deny: set[str], *, generic: bool = True) -> list[str]:
         if first & 1 or mac.upper() == "00:00:00:00:00:00":
             continue  # broadcast/multicast/null are never a device's own address
         if not mac.upper().startswith(ALLOWED_MAC_PREFIXES):
-            found.append(f"MAC address outside fixture ranges ({mac[:8]}â€¦)")
+            found.append(f"MAC address outside fixture ranges ({mac[:8]}…)")
     for raw in (IPV4.findall(text) if generic else []):
         try:
             ip = ipaddress.ip_address(raw)

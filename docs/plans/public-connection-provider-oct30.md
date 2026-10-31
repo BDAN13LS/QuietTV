@@ -117,7 +117,8 @@ kill helper never show a console. No persistent listener, boot/root service, glo
 
 On Windows the owner configuration is validated from machine-readable SIDs, not localised
 account names: the ACL query returns the owner SID, current-user SID and allow/deny ACE
-SIDs. Allow ACEs may name only the file's current owner SID, LocalSystem (`S-1-5-18`) or
+SIDs. The owner must be the current user, LocalSystem or Administrators. Allow ACEs
+may name only the current user SID, LocalSystem (`S-1-5-18`) or
 built-in Administrators (`S-1-5-32-544`); the current user must own the file or be allowed
 by one of those principals. Other allow principals, an unparseable ACL, a missing
 current-user path or a failure to query refuse. The query uses absolute
