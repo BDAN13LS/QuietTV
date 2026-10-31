@@ -403,6 +403,13 @@ _PRIVACY_ACL_SCRIPT = (
     "if($r.AccessControlType -ne"
     " [System.Security.AccessControl.AccessControlType]::Allow){exit 11};"
     "if($r.IsInherited){exit 12};"
+    # The ACE must grant exactly FullControl with exactly the requested inheritance and
+    # no propagation, matching the owner-only contract (not merely "an allow for us").
+    "if($r.FileSystemRights -ne"
+    " [System.Security.AccessControl.FileSystemRights]::FullControl){exit 13};"
+    "if($r.InheritanceFlags -ne $inh){exit 14};"
+    "if($r.PropagationFlags -ne"
+    " [System.Security.AccessControl.PropagationFlags]::None){exit 15};"
     "[System.Console]::Out.Write('" + _ACL_OK + "');"
     "}catch{exit 5}")
 

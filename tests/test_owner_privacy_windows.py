@@ -160,11 +160,16 @@ class OwnerAclFailureTests(unittest.TestCase):
 
     def test_invocation_shape_is_hidden_system32_powershell(self):
         result = subprocess.CompletedProcess([], 0, stdout=oi._ACL_OK, stderr="")
-        with mock.patch.dict(oi.os.environ, {"PSMODULEPATH": r"C:\outer\7\Modules"}, clear=False):
+        # CREATE_NO_WINDOW exists only on Windows; patch a synthetic value (create=True)
+        # so the hidden-window assertion runs on every CI platform, Linux included.
+        no_window = 0x08000000
+        with mock.patch.object(oi.subprocess, "CREATE_NO_WINDOW", no_window, create=True), \
+                mock.patch.dict(oi.os.environ, {"PSMODULEPATH": r"C:\outer\7\Modules"}, clear=False):
             with self._patch(return_value=result) as run:
                 oi._owner_only_acl(self.tmp / "unit", inherit=True)
             # The parent environment must be left untouched while the child drops it.
             self.assertEqual(oi.os.environ.get("PSMODULEPATH"), r"C:\outer\7\Modules")
+            self.assertTrue(run.call_args.kwargs["creationflags"] & no_window)
         argv = run.call_args.args[0]
         self.assertTrue(str(argv[0]).lower().endswith("powershell.exe"))
         self.assertIn("System32", str(argv[0]))
@@ -174,8 +179,6 @@ class OwnerAclFailureTests(unittest.TestCase):
         self.assertFalse(any(k.upper() == "PSMODULEPATH" for k in env))
         self.assertEqual(env["QTV_PRIVATE_KIND"], "dir")
         self.assertEqual(env["QTV_PRIVATE_PATH"], str(self.tmp / "unit"))
-        self.assertTrue(run.call_args.kwargs["creationflags"]
-                        & getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
     @unittest.skipUnless(os.name == "nt", "make_private_dir ACL step is Windows-only")
     def test_make_private_dir_leaves_no_directory_on_failure(self):
