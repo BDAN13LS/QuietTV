@@ -33,8 +33,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 7010,
-      "sha256": "c6947e4f43012ce1de14e5c73b43f2d8e17deec5d409bba481570f925f52b291"
+      "size": 7136,
+      "sha256": "d10540de8b1a59d0128edb01f85b61804570cb96c823c6a8763d5f6303582f8c"
     },
     {
       "path": ".gitignore",
@@ -308,8 +308,8 @@
     },
     {
       "path": "helper/owner_init.py",
-      "size": 25848,
-      "sha256": "4ffcf5ce244a52001040ea2bee3c1f14664700201f18d6462c1828a730515ac3"
+      "size": 29589,
+      "sha256": "5b957c481c8f9c88ba91123ccfa113434cc40c1df12fb0c1acefb1cbb3453531"
     },
     {
       "path": "helper/requirements-bootstrap.txt",
@@ -768,8 +768,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 7466,
-      "sha256": "68f6b269cc3b90570867ec809b71eda6896a8bf935722621e30b4e9d282e80d0"
+      "size": 7509,
+      "sha256": "30579487e63c5e844c933b6e87da4ea8961460d7b926620e26b5d0950daf48ae"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -1100,6 +1100,11 @@
       "path": "tests/test_owner_init.py",
       "size": 16030,
       "sha256": "1b3e54634453b0ee634c57c76229269648116843765c1116642e2626d59f0788"
+    },
+    {
+      "path": "tests/test_owner_privacy_windows.py",
+      "size": 9444,
+      "sha256": "b4a956763be8a0fea3bc040aa368a31722b72f2f98617f6863525f517bcad26b"
     },
     {
       "path": "tests/test_public_host_source.py",
