@@ -59,7 +59,7 @@ jobs:
           npm run build
       - name: Owner configuration and packaged widget checks
         run: |
-          .venv/bin/python -m unittest discover -s tests -p 'test_owner_init.py' -q
+          .venv/bin/python -m unittest discover -s tests -p 'test_owner*.py' -q
           .venv/bin/python -m unittest discover -s tests -p 'test_widget*.py' -q
           .venv/bin/python -m unittest discover -s tests -p 'test_helper*.py' -q
           node --test tests/test_helper_ui.mjs
@@ -96,6 +96,8 @@ jobs:
       - name: Public provider unit tests (fake SDK/root; Windows ACL cases execute)
         shell: pwsh
         run: |
+          python -m unittest discover -s tests -p "test_owner*.py" -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tests -p test_public_provider_liveops.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

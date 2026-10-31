@@ -58,6 +58,7 @@
     "launcher/widget/quiettv-bridge.js",
     "launcher/widget/tv-inputs.js",
     "tests/test_owner_init.py",
+    "tests/test_owner_privacy_windows.py",
     "tests/test_widget_build.py",
     "tests/test_widget_bridge.py",
     "tests/test_public_host_source.py",
