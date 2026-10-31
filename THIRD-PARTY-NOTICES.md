@@ -1,5 +1,16 @@
 # Third-party notices
 
+## Diagnostic connection source
+
+The selected Python and C# files in `public-toolkit/vendor/` come from
+[chris-ritsen/samsung-tv-root, pinned commit 4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b](https://github.com/chris-ritsen/samsung-tv-root/tree/4ad2c4d3b0d0e0da4b5b7ebe4a787e94596f416b).
+Their upstream Unlicense is retained in
+[public-toolkit/vendor/UPSTREAM-LICENSE](public-toolkit/vendor/UPSTREAM-LICENSE).
+The [vendor notice](public-toolkit/vendor/NOTICE.md) records the selected files and
+local Windows/runtime adaptations. These are buildable sources; this addition
+does not distribute SDK executables, prebuilt root payloads, Samsung firmware,
+stock applications or owner credentials.
+
 ## Native remote input adaptation (source release preparation)
 
 The private native host's Home-key forwarding code was adapted from

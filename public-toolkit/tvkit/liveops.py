@@ -1,9 +1,9 @@
 """Typed, finite privileged-operation contract for one live report collection.
 
-The public toolkit ships NO implemented adapter, exactly like
-:mod:`tvkit.transport` and :mod:`tvkit.capture`. A parent-owned, reviewed
-adapter supplies the TV channel (SDB/root/signing) through this contract; the
-public code only orchestrates one run over tool-computed values.
+The default registry has no active adapter. An explicitly configured reviewed
+provider in :mod:`tvkit.provider`, or a trusted parent adapter, supplies the
+TV channel through this finite contract. Collection operates only on
+tool-computed values; configuration never loads an arbitrary plugin.
 
 What this contract deliberately is NOT
 --------------------------------------

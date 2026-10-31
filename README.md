@@ -44,8 +44,12 @@ are planned. See the
 [consumer install design](docs/CONSUMER-INSTALL-DESIGN-2026-10-27.md).
 
 Advanced developer tooling can now [collect fresh device reports](tools/tv-collect/README.md)
-through a trusted provider and produce inputs for the Helper. A temporary maintainer
-provider was verified on the reference TV; the public privileged provider is still pending.
+with the reviewed `owner-sdk-root` provider and produce inputs for the Helper. It is a
+manual, owner-configured **ADVANCED diagnostic**, one TV at a time: the owner supplies an
+explicit private config (SDK and OpenSSL paths and hashes, SDK DUID pin, private IPv4
+target/callback, trusted profile and policy), an owner-signed Facts widget and the built
+artifact hashes. It was run once end-to-end on the reference TV; the guided consumer flow
+in the Helper is not wired.
 
 On the reference TV, Home, the remote, native app launch, Settings, the input picker,
 Store opening and unattended root recovery were tested.
@@ -99,7 +103,8 @@ Verify results with status/captures. Distinguish observed from untested outcomes
 - [x] Package/security-metadata capture and verified PC readback on the reference TV.
 - [x] Local AI/MCP tools for status, controls, screenshots and optional wake.
 - [x] Streamed PC backup assembly with measured memory regression tests.
-- [ ] Automatic firmware verification and a public privileged connection.
+- [x] Advanced owner-configured CLI collection with the reviewed public provider on the reference TV (manual per-owner setup).
+- [ ] Automatic firmware verification and guided consumer connection integration.
 - [ ] Complete backup/restore and independent Rescue, verified on hardware.
 - [ ] Guided consumer installer and cleanup selection.
 - [ ] Verify Store app-update installation, DRM playback and physical HDMI video.

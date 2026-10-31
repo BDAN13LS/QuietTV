@@ -1,9 +1,12 @@
 # tv-collect — one live ProductInfo + native frame collection
 
 Owner-invoked PC orchestrator for a **single** live collection over an
-**injected, trusted** TV adapter. This directory ships no adapter and no TV,
-signing, root or network code. With no registered adapter it refuses and writes
-nothing.
+**injected, trusted** TV adapter. It ships one reviewed provider,
+`owner-sdk-root`, which is constructed only from an explicit owner-private
+configuration. With neither a provider config nor a registered parent adapter
+it refuses and writes nothing. This directory itself contains no TV, signing,
+root or network code; the provider drives the owner's pinned SDK and builds its
+root payloads from the checked vendored source.
 
 It produces two fresh same-session observations of one TV — a
 `quiettv-device-facts/1` ProductInfo report and a `quiettv-inspection/1` native
@@ -11,6 +14,85 @@ frame — joins them through the existing `tvkit.factsjoin` library, and writes 
 `quiettv-helper-preflight/1` config that the existing Helper
 (`--preflight-config`) displays offline. Nothing here changes Helper HTTP
 routes, enables an action, or touches Home/boot/startup.
+
+## Reviewed public provider (`owner-sdk-root`)
+
+`--provider-config <file> --adapter owner-sdk-root` loads the reviewed provider
+in `public-toolkit/tvkit/provider/`. The config must be an explicit absolute
+JSON file outside every repository, owner-only on disk, with exactly these
+keys and no defaults:
+
+```
+schema                  "quiettv-live-provider/1"
+target                  private-LAN IPv4 of the TV
+callbackHost            private-LAN IPv4 of this PC
+expectedSdkDuid         the owner's explicit SDK-DUID pin (never inferred)
+sdk                     { executable: absolute sdb, sha256 }
+rootPayloads            { archiveRootDll: {path, sha256}, rootAgentDll: {path, sha256} }
+openssl                 { executable: absolute openssl, sha256 }
+timeouts                { sdkSeconds, probeSeconds, commandSeconds,
+                          nativeSeconds, reportAttempts }
+```
+
+The SDK, both payload DLLs and OpenSSL are re-hashed immediately before every
+use. Any pin mismatch, missing file or malformed key refuses before device work.
+An unknown `--adapter` name is refused even when a config is given, and omitting
+`--provider-config` leaves the public registry empty and the tool fails closed.
+
+The provider issues one fixed `sdb connect <target>:26101` for its own session
+before the first capture, probe or write, and never calls `kill-server` or
+`disconnect`. Its raw SDK guard reads `0 getduid` before every operation and
+again before every write, including before the first staging capture. It must
+equal `expectedSdkDuid`; a mismatch or unreadable DUID poisons the session, so
+no later install, launch or cleanup can touch a changed target. Root work runs
+the vendored upstream probe in a fresh child process and additionally requires
+authenticated root identity (`uid/euid/gid/egid` zero), all commands exiting
+zero, unchanged `/etc/passwd` and `/usr/share/sdbd/public.pem`, and a cleaned
+staging namespace. The SDK is never found through `PATH`.
+
+The SDK group used for the run directory is read by the vendored restricted-shell
+`SdbClient.capture("id -g")` callback in a finite isolated worker, because the
+reference SDK does not execute that Unix command through its raw shell. It is
+bounded, requires the terminal `[exit:0]` marker, and returns one integer. This
+is the SDK user's group, not the root probe's `gid` (which must still be zero).
+
+It creates only
+`/home/owner/share/tmp/sdk_tools/quiettv-collect-<run-id>` for this run, using a
+fresh non-recursive `mkdir`, the owner UID read from the existing SDK-tools
+directory and the SDK-captured group, mode `770` so the captured group keeps the
+tested SDK upload path. The parent never chmods or chowns a pre-existing
+directory or the global SDK-tools root. The install postcondition is the fixed
+package-database `package:application` count, not an exit code alone. Cleanup
+uninstalls only a package whose absence was proven before this run, and removes
+only this run's exact upload paths after re-checking each SHA-256. A mismatched
+replacement is left intact and the run reports `recovery-needed`.
+
+Report and native reads refuse symlinks and non-regular files. Report reads use
+a true `head -c` bound before base64 encoding, so a growing or oversized file
+cannot outrun the read, and the decoded length is checked again. The target must
+offer runtime `6.0`; a non-6 assessment is rejected by the worker before the
+upstream payload is staged or executed. Only the two root DLLs are pinned as
+external root payload files; the upstream launcher generates its runtimeconfig
+files internally, so they are not four separately pinned inputs.
+
+The isolated worker sets the measured restricted-shell timing locally before
+any SDK capture or root preflight: injection delay `6.0` and minimum delta
+`4.0` seconds (upstream `2.0`/`1.5` is flaky on the reference TV). The delta
+check remains in force; no host environment or module global is changed.
+
+Native uploads require this session's own verified fresh run directory, and a
+partial push leaves no trusted bundle. Immediately before dotnet, one fixed
+compound shell guard re-hashes the three remote bundle files against the stored
+pushed pins, so a replaced DLL/runtimeconfig/deps refuses execution. Cleanup
+uses the session's own absence result, confirmed install postcondition and
+actual uploaded paths. A failed or partial install that leaves a package
+present is never uninstalled and its data is left intact with recovery needed.
+
+On Windows the provider config ACL is checked by SID, not localised names: the
+current user, LocalSystem (`S-1-5-18`) and Administrators (`S-1-5-32-544`) may be
+allowed, and the file owner must be one of them; other allow principals, unparseable ACLs and missing current-user
+access refuse. Child processes use hidden, grouped Windows creation flags and
+the absolute trusted `taskkill.exe`.
 
 ## Adapter contract (`tvkit/liveops.py`)
 
@@ -48,7 +130,8 @@ guarantee: an adapter that mutates its target mid-session is out of contract.
 
 | input | rule |
 |---|---|
-| `--adapter` | name in the **empty** reviewed registry; no module path, no plugin import |
+| `--adapter` | name in the **empty** reviewed registry, or exactly `owner-sdk-root` with `--provider-config`; no module path, no plugin import |
+| `--provider-config` | optional explicit owner-private provider JSON; enables only the fixed `owner-sdk-root` name |
 | `--out-dir` | absolute plain local directory, outside every git checkout, must not exist |
 | `--signed-wgt` | owner-signed `.wgt`; its `config.xml` must declare `package == --package-id` and `application == <package-id>.Facts` |
 | `--wgt-sha256` | trusted pin for the exact signed bytes |
@@ -140,26 +223,58 @@ provider-raised `LiveCollectionError` with an unsafe message — is converted to
 a fixed, non-secret `LiveCollectionError` without echoing or chaining provider
 text. The CLI never prints a traceback for those.
 
-## How to build and run (parent-owned)
+## How to build and run
+
+No prebuilt binaries are distributed. Build the inspector and both root payload
+projects from the checked sources into a **new** owner-private directory outside
+every repository:
 
 ```
-dotnet build tools/tv-inspect/QuietTVInspect.csproj -c Release   # pinned SDK 6.0.428
+python tools/tv-collect/provider_build.py \
+  --dotnet <absolute dotnet 6.0 executable> \
+  --out-dir <new private directory>
+python tools/tv-collect/provider_build.py --check <out-dir>/provider-artifacts.json
+```
+
+The helper writes `quiettv-provider-artifacts/1` with the absolute path and
+SHA-256 of each of the five artifacts. The CLI is exact: `--dotnet <absolute
+dotnet> --out-dir <new private directory>` builds; `--dry-run` prints the plan
+and writes nothing; `--check <absolute manifest> [--provider-config <absolute
+config>]` re-hashes the build. `--check` cannot be combined with the build flags,
+and `--provider-config` is accepted only with `--check`. With a config, `--check`
+also confirms that it pins those exact root payloads. Point the provider config's
+`rootPayloads` at `SamsungTvArchiveRoot.dll` and `SamsungTvRootAgent.dll` from
+that build, and pass its `QuietTVInspect*.dll/runtimeconfig.json/deps.json` as
+the three inspector inputs. Then:
+
+```
 python tools/tv-device-facts/pack.py --app-id <package>.Facts --package <package> --out <new>.wgt
 # sign the .wgt with the owner's reviewed tooling (not in this repository)
-python tools/tv-collect/collect.py --adapter <parent adapter name> ...
+python tools/tv-collect/collect.py --adapter owner-sdk-root \
+  --provider-config <owner-private provider.json> ...
 ```
 
-The parent registers its reviewed `LiveOps` in `liveops.LIVEOPS` (or passes an
-explicit instance to `tvkit.livecollect.collect_reports(..., ops=...)`).
+A parent may instead register its own reviewed `LiveOps` in `liveops.LIVEOPS`
+(or pass an explicit instance to `collect_reports(..., ops=...)`).
 
-## What cannot ship yet
+## Limitations
 
-- The privileged `LiveOps` adapter (SDB/root/signing, one-shot callback token)
-  is **not** in this public repository. Without one the tool fails closed.
-- This slice makes no claim that boot, root or the launcher are unchanged; only
-  the parent's own live channel can verify that.
-- A stock-TV consumer setup still needs a published, reviewed, typed adapter
-  and an authenticated-root read path. Both are future work, not assumed here.
+- The provider targets one owner-configured TV at a time; there is no default
+  target, discovery, scan or maintainer credential.
+- The payloads target the common .NET 6 runtime only. No claim is made for
+  common31, QN90 or any other model/firmware.
+- The provider does not attest the full model or firmware. The diagnostic widget
+  collects the exact ProductInfo firmware/model in the same run; the trusted
+  facts-join policy and profile decide compatibility afterwards. The native
+  inspector intentionally does not infer them, and the SDK DUID is never treated
+  as the ProductInfo identity.
+- It makes no claim that boot, root or the launcher are unchanged. The root
+  probe reports protected-file hashes and staging cleanup, and cleanup removes
+  only this run's namespace, but this is not a boot-integrity attestation.
+- The public provider was run end-to-end once on the reference TV and is covered
+  by offline fake-SDK/fake-root tests. This is a one-time ADVANCED diagnostic with
+  manual per-owner setup, not a consumer installation. Guided consumer integration,
+  fresh-stock end-to-end verification and restore remain pending.
 
 On the reference TV the Samsung SDK rejects pushes to `/tmp`. Run directories therefore
 use `/home/owner/share/tmp/sdk_tools/quiettv-collect-<run-id>`. The trusted adapter must
@@ -169,19 +284,36 @@ this does not establish compatibility on another model or firmware.
 
 ## Reference-TV verification
 
-A warm run on the reference Samsung UN43U8000FBXZA / firmware 1300.8 / Tizen 9 / ARMv7
-used a temporary maintainer-controlled SDK/root provider. The public collector installed
-and launched its diagnostic widget, captured its fresh ProductInfo report, staged and ran
-the pinned native inspector, matched the seven profile facts, and reconciled its temporary
-package and uploads. The same boot, root and launcher processes remained, and four protected
-runtime/recovery files matched their original hashes. The dashboard foreground was reported
-again after Home. No reboot was required.
+The reviewed public `owner-sdk-root` provider was exercised once end-to-end on the
+reference Samsung UN43U8000FBXZA / firmware T-X22UDFAKUC-0090-1300.8 / Tizen 9 / ARMv7
+/ .NET 6.0.9 with an owner-private config, an official owner-signed Facts widget and an
+inspector built from the checked sources. The SDK raw-identity pin matched; temporary root
+was authenticated with uid/euid 0; root staging was cleaned; the original `/etc/passwd`
+and SDB key hashes were unchanged.
+
+The full CLI installed and launched its diagnostic widget, captured its fresh ProductInfo
+report, staged and ran the pinned native inspector, joined all seven facts and wrote the
+exact Helper config. The SDK uninstalled only its own diagnostic package and removed its
+uploads and run directory. An independent physical root read confirmed the package, both
+payload/data roots and the run directory absent, four protected runtime hashes unchanged,
+and boot/control-service/dashboard PIDs unchanged; Home was requested. No reboot was
+required. The complete collection took 570.579 s (~9 min 30 s) because of 17 isolated
+root probes.
 
 The running Helper then loaded the exact generated `helper-preflight-config.json` through
-its normal CLI and authenticated HTTP interface. It displayed the seven matching facts,
-kept every change action unavailable and exposed no identity, token or source path in HTTP.
-These are fresh observations supplied as saved files to the Helper; the Helper has no new
-live-collection HTTP route. A public privileged provider and hardware restore remain pending.
+its normal CLI and authenticated HTTP interface. It displayed the seven matching facts with
+sources, kept every change action unavailable and exposed no identity, token or source path
+in HTTP. These are fresh observations supplied as saved files to the Helper; the Helper has
+no new live-collection HTTP route and its live guided flow is not wired.
+
+This is a one-time ADVANCED diagnostic with manual per-owner setup; it makes no cold-boot
+improvement or consumer-install claim. Fresh-stock end-to-end verification, consumer
+install/cleanup and hardware restore remain unavailable until independent hardware Rescue
+and full restore are verified. No stock firmware, packages, keys or binaries are
+distributed, and no TV reboot or startup/launcher change was made for this feature. After
+the hardware run, small changes (1 MB boundary, standard numeric RFC 1918 range form,
+synthetic example addresses, source-guard passwd colon parsing) were verified offline; the
+provider root core is the hardware-tested reference path.
 
 The native inventory is a snapshot taken while the diagnostic widget is installed. Future
 app-selection consumers must exclude that diagnostic package or obtain a post-cleanup
