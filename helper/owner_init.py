@@ -361,19 +361,71 @@ def check_outside_repos(path: str | os.PathLike, *, must_not_exist: bool = True,
     return target
 
 
-def _current_user_sid() -> str:
-    out = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, text=True,
-                         timeout=20, check=True).stdout.strip()
-    sid = out.split(",")[-1].strip().strip('"')
-    if not re.fullmatch(r"S-1-[0-9-]+", sid):
-        _fail("could not resolve the current user SID")
-    return sid
+# Replace the object's DACL in a single write with one current-user FullControl ACE.
+# icacls /inheritance:r /grant:r only removes inherited ACEs and rewrites the named SID's
+# grant; any explicit ACE for another principal (e.g. an inherited-then-copied Everyone
+# grant) survived, so the object was not owner-only and the strict checker refused it.
+# This builds a fresh, protected FileSecurity/DirectorySecurity in memory and writes it
+# once, so no stray ACE can remain. Owner and SACL are left untouched, inheritance is
+# blocked (protected), and no privilege or UAC change is made. A directory's ACE inherits
+# to children (ContainerInherit|ObjectInherit); a file's does not. The script reads the
+# DACL back and refuses unless it is exactly the one protected current-user ACE.
+_ACL_OK = "QTV-ACL-OK"
+_PRIVACY_ACL_SCRIPT = (
+    "$ErrorActionPreference='Stop';"
+    "try{"
+    "$p=$env:QTV_PRIVATE_PATH;$kind=$env:QTV_PRIVATE_KIND;"
+    "$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User;"
+    "if($kind -eq 'dir'){"
+    "if(-not [System.IO.Directory]::Exists($p)){exit 6};"
+    "$sec=New-Object System.Security.AccessControl.DirectorySecurity;"
+    "$inh=[System.Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit';"
+    "}elseif($kind -eq 'file'){"
+    "if(-not [System.IO.File]::Exists($p)){exit 6};"
+    "$sec=New-Object System.Security.AccessControl.FileSecurity;"
+    "$inh=[System.Security.AccessControl.InheritanceFlags]::None;"
+    "}else{exit 7};"
+    "$sec.SetAccessRuleProtection($true,$false);"
+    "$rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,"
+    "[System.Security.AccessControl.FileSystemRights]::FullControl,$inh,"
+    "[System.Security.AccessControl.PropagationFlags]::None,"
+    "[System.Security.AccessControl.AccessControlType]::Allow);"
+    "$sec.AddAccessRule($rule);"
+    "if($kind -eq 'dir'){[System.IO.Directory]::SetAccessControl($p,$sec)}"
+    "else{[System.IO.File]::SetAccessControl($p,$sec)};"
+    "$chk=if($kind -eq 'dir'){[System.IO.Directory]::GetAccessControl($p)}"
+    "else{[System.IO.File]::GetAccessControl($p)};"
+    "if(-not $chk.AreAccessRulesProtected){exit 8};"
+    "$rules=@($chk.GetAccessRules($true,$true,"
+    "[System.Security.Principal.SecurityIdentifier]));"
+    "if($rules.Count -ne 1){exit 9};$r=$rules[0];"
+    "if($r.IdentityReference.Value -ne $sid.Value){exit 10};"
+    "if($r.AccessControlType -ne"
+    " [System.Security.AccessControl.AccessControlType]::Allow){exit 11};"
+    "if($r.IsInherited){exit 12};"
+    "[System.Console]::Out.Write('" + _ACL_OK + "');"
+    "}catch{exit 5}")
 
 
 def _owner_only_acl(path: Path, inherit: bool) -> None:
-    grant = "*" + _current_user_sid() + (":(OI)(CI)F" if inherit else ":F")
-    subprocess.run(["icacls", str(path), "/inheritance:r", "/grant:r", grant],
-                   capture_output=True, timeout=30, check=True)
+    powershell = Path(os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+                      or r"C:\Windows") / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+    # A PowerShell 7 PSMODULEPATH inherited into Windows PowerShell 5.1 breaks module
+    # autoload; strip it case-insensitively. The parent environment is never modified.
+    environment = {k: v for k, v in os.environ.items() if k.upper() != "PSMODULEPATH"}
+    environment["QTV_PRIVATE_PATH"] = str(path)
+    environment["QTV_PRIVATE_KIND"] = "dir" if inherit else "file"
+    try:
+        result = subprocess.run(
+            (str(powershell), "-NoLogo", "-NoProfile", "-NonInteractive",
+             "-ExecutionPolicy", "Bypass", "-Command", _PRIVACY_ACL_SCRIPT),
+            capture_output=True, text=True, timeout=30, check=False,
+            stdin=subprocess.DEVNULL, env=environment,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError):
+        _fail("owner-only ACL could not be applied")
+    if result.returncode != 0 or type(result.stdout) is not str or result.stdout.strip() != _ACL_OK:
+        _fail("owner-only ACL could not be applied")
 
 
 def make_private_file(path: Path) -> str:
