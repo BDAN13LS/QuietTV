@@ -1479,14 +1479,26 @@ class ProcessTests(unittest.TestCase):
 
     def test_windows_taskkill_is_absolute_and_hidden(self):
         process = mock.Mock(pid=4321)
-        with mock.patch.object(proc.os, "name", "nt"), \
-                mock.patch.object(proc.subprocess, "run") as run:
-            proc._kill_tree(process)
-        argv = run.call_args.args[0]
+        create_no_window = 0x08000000
+        missing = object()
+        original = getattr(proc.subprocess, "CREATE_NO_WINDOW", missing)
+        if original is not missing:
+            delattr(proc.subprocess, "CREATE_NO_WINDOW")
+        try:
+            self.assertFalse(hasattr(proc.subprocess, "CREATE_NO_WINDOW"))
+            with mock.patch.object(proc.os, "name", "nt"), \
+                    mock.patch.object(proc.subprocess, "CREATE_NO_WINDOW",
+                                      create_no_window, create=True), \
+                    mock.patch.object(proc.subprocess, "run") as run:
+                proc._kill_tree(process)
+            argv = run.call_args.args[0]
+            creationflags = run.call_args.kwargs["creationflags"]
+        finally:
+            if original is not missing:
+                setattr(proc.subprocess, "CREATE_NO_WINDOW", original)
         self.assertTrue(argv[0].lower().endswith("taskkill.exe"))
         self.assertIn("System32", argv[0])
-        self.assertTrue(run.call_args.kwargs["creationflags"]
-                        & getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        self.assertTrue(creationflags & create_no_window)
         process.wait.assert_called_once()
 
     def test_input_is_delivered(self):
@@ -1648,6 +1660,36 @@ class ProviderConfigTests(unittest.TestCase):
         self.assertIn("System32", str(argv[0]))
         self.assertTrue(run.call_args.kwargs["creationflags"]
                         & getattr(subprocess, "CREATE_NO_WINDOW", 0))
+
+    @unittest.skipUnless(os.name == "nt", "Windows ACL validation")
+    def test_administrators_owner_with_current_user_allow_is_accepted(self):
+        document = self._acl_document(ownerSid=self.ADMIN_SID,
+                                      currentUserSid=self.USER_SID)
+        outcome, _ = self._run_acl(document)
+        self.assertEqual(outcome, "accepted")
+
+    @unittest.skipUnless(os.name == "nt", "Windows ACL validation")
+    def test_system_owner_with_current_user_allow_is_accepted(self):
+        document = self._acl_document(ownerSid=self.SYSTEM_SID,
+                                      currentUserSid=self.USER_SID)
+        outcome, _ = self._run_acl(document)
+        self.assertEqual(outcome, "accepted")
+
+    @unittest.skipUnless(os.name == "nt", "Windows ACL validation")
+    def test_unrelated_owner_is_refused_even_with_current_user_allow(self):
+        document = self._acl_document(ownerSid=self.OTHER_SID,
+                                      currentUserSid=self.USER_SID)
+        outcome, _ = self._run_acl(document)
+        self.assertEqual(outcome, "refused")
+
+    @unittest.skipUnless(os.name == "nt", "Windows ACL validation")
+    def test_administrators_owner_with_other_allow_is_refused(self):
+        document = self._acl_document(
+            ownerSid=self.ADMIN_SID, currentUserSid=self.USER_SID,
+            aces=[{"sid": self.USER_SID, "type": "Allow"},
+                  {"sid": self.OTHER_SID, "type": "Allow"}])
+        outcome, _ = self._run_acl(document)
+        self.assertEqual(outcome, "refused")
 
     @unittest.skipUnless(os.name == "nt", "Windows ACL validation")
     def test_acl_child_drops_inherited_psmodulepath_only(self):

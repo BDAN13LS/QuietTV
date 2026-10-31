@@ -174,7 +174,10 @@ def _owner_private_windows(path: Path) -> None:
     aces = document["aces"]
     if type(is_admin) is not bool or not isinstance(aces, list) or len(aces) > 64:
         _fail("the provider configuration permissions could not be parsed")
-    allowed = {owner, _SYSTEM_SID, _ADMINISTRATORS_SID}
+    trusted = {current, _SYSTEM_SID, _ADMINISTRATORS_SID}
+    if owner not in trusted:
+        _fail("the provider configuration must be owner-private")
+    allowed = trusted
     access = owner == current
     for ace in aces:
         if (not isinstance(ace, dict) or set(ace) != {"sid", "type"}
