@@ -137,7 +137,7 @@
     },
     {
       "path": "vendor/",
-      "reason": "Third-party root payload. This toolkit is not a root bypass and does not redistribute it."
+      "reason": "Private vendor tree and prebuilt payloads remain excluded. The reviewed pinned source subset is published under public-toolkit/vendor/ with upstream provenance and notices; no opaque binaries or owner setup files are distributed."
     },
     {
       "path": "private/",
@@ -149,7 +149,7 @@
     },
     {
       "path": "run_root.py, root_compat.py, receive_backup.py, tools/sdb-tunnel-client.cjs",
-      "reason": "Privileged transport and root tooling. Stays with the owner; the public toolkit ships no transport."
+      "reason": "Owner-specific transport, compatibility wrappers, backup receiver and tunnel helpers remain private. The reviewed owner-configured diagnostic provider is published under public-toolkit/tvkit/provider/; consumer startup and recovery integration remain pending."
     },
     {
       "path": "*.json, *.txt, *.png at the repository root",
