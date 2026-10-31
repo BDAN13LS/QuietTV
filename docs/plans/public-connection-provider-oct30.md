@@ -123,13 +123,16 @@ by one of those principals. Other allow principals, an unparseable ACL, a missin
 current-user path or a failure to query refuse. The query uses absolute
 `WindowsPowerShell` with no window and never echoes ACL output. POSIX mode `0600` remains.
 
-A separate local build helper under `tools/tv-collect/` builds the two checked C# root
-payload projects and the inspector with an explicit .NET 6 SDK into a new owner-private
-directory outside every repository, and hashes the five outputs into a
-`quiettv-provider-artifacts/1` manifest. Its re-check mode re-hashes the artifacts and,
-with `--provider-config`, confirms that the owner config pins those exact root payloads.
-It has a no-write dry-run. It does not invent owner values or write a provider config. No
-prebuilt binary is shipped.
+A separate local build helper, `tools/tv-collect/provider_build.py`, builds the two
+checked C# root payload projects and the inspector with an explicit .NET 6 SDK into a new
+owner-private directory outside every repository, and hashes the five outputs into a
+`quiettv-provider-artifacts/1` manifest. Its CLI is exact: `--dotnet <absolute dotnet>
+--out-dir <new private directory>` builds; `--dry-run` prints the plan and writes nothing;
+`--check <absolute manifest> [--provider-config <absolute config>]` re-hashes the
+artifacts and, with a config, confirms that it pins those exact root payloads. `--check`
+cannot be combined with the build flags, and `--provider-config` is accepted only with
+`--check`. It does not invent owner values or write a provider config. No prebuilt binary
+is shipped.
 
 ## Tests
 
@@ -154,3 +157,32 @@ never uninstalled and its data is left for recovery. Windows tests cover the own
 Administrators SID ACL accept path, other named/world allow denial, unparseable ACLs and
 hidden child flags; the worker test pins the measured 6/4 injection timing. Build-helper
 tests cover dry-run and manifest checking.
+
+## Reference hardware verification (2026-10-30)
+
+The reviewed public `owner-sdk-root` provider was exercised once end-to-end on the
+reference Samsung UN43U8000FBXZA / firmware T-X22UDFAKUC-0090-1300.8 / Tizen 9 /
+ARMv7 / .NET 6.0.9, using an owner-private config, an official owner-signed Facts
+widget and an inspector built from the checked sources.
+
+- The SDK raw-identity pin matched. Temporary root was authenticated with uid/euid 0;
+  root staging was cleaned; the original `/etc/passwd` and SDB key hashes were unchanged.
+- The full CLI collected a fresh ProductInfo report and native frame, joined all seven
+  facts, wrote the exact Helper config, and the SDK uninstalled only its own diagnostic
+  package and removed its uploads and run directory.
+- An independent physical root read confirmed the package, both payload/data roots and
+  the run directory absent, four protected runtime hashes unchanged, and boot/control
+  service/dashboard PIDs unchanged; Home was requested.
+- The actual Helper CLI and authenticated HTTP loaded the exact new config and displayed
+  the seven facts with sources, without identity, token or source paths. All change
+  actions remained OFF; the Helper live guided flow was not wired.
+- The complete collection took 570.579 s (~9 min 30 s) because of 17 isolated root probes.
+
+This is a one-time ADVANCED diagnostic. It does not claim a cold-boot improvement, a
+consumer installation, a fresh-stock end-to-end result, or consumer restore/cleanup capability.
+Consumer install, cleanup and restore remain unavailable until independent hardware
+Rescue and full restore are verified. No stock firmware, packages, keys or binaries are
+distributed. After the hardware run, small changes (1 MiB boundary, standard numeric
+RFC 1918 range form, synthetic example addresses, source-guard passwd colon parsing)
+were verified offline; the provider root core is the hardware-tested reference path.
+No TV reboot or startup/launcher change was made for this feature.

@@ -237,12 +237,15 @@ python tools/tv-collect/provider_build.py --check <out-dir>/provider-artifacts.j
 ```
 
 The helper writes `quiettv-provider-artifacts/1` with the absolute path and
-SHA-256 of each of the five artifacts. Point the provider config's
+SHA-256 of each of the five artifacts. The CLI is exact: `--dotnet <absolute
+dotnet> --out-dir <new private directory>` builds; `--dry-run` prints the plan
+and writes nothing; `--check <absolute manifest> [--provider-config <absolute
+config>]` re-hashes the build. `--check` cannot be combined with the build flags,
+and `--provider-config` is accepted only with `--check`. With a config, `--check`
+also confirms that it pins those exact root payloads. Point the provider config's
 `rootPayloads` at `SamsungTvArchiveRoot.dll` and `SamsungTvRootAgent.dll` from
 that build, and pass its `QuietTVInspect*.dll/runtimeconfig.json/deps.json` as
-the three inspector inputs. `--check` re-hashes the build, and with
-`--provider-config` also confirms that the config pins those exact root payloads.
-Then:
+the three inspector inputs. Then:
 
 ```
 python tools/tv-device-facts/pack.py --app-id <package>.Facts --package <package> --out <new>.wgt
@@ -268,9 +271,10 @@ A parent may instead register its own reviewed `LiveOps` in `liveops.LIVEOPS`
 - It makes no claim that boot, root or the launcher are unchanged. The root
   probe reports protected-file hashes and staging cleanup, and cleanup removes
   only this run's namespace, but this is not a boot-integrity attestation.
-- The public provider is implemented and covered by offline fake-SDK/fake-root
-  tests; it has not yet been run on the reference TV. Hardware verification and
-  restore remain pending.
+- The public provider was run end-to-end once on the reference TV and is covered
+  by offline fake-SDK/fake-root tests. This is a one-time ADVANCED diagnostic with
+  manual per-owner setup, not a consumer installation. Guided consumer integration,
+  fresh-stock end-to-end verification and restore remain pending.
 
 On the reference TV the Samsung SDK rejects pushes to `/tmp`. Run directories therefore
 use `/home/owner/share/tmp/sdk_tools/quiettv-collect-<run-id>`. The trusted adapter must
@@ -280,20 +284,36 @@ this does not establish compatibility on another model or firmware.
 
 ## Reference-TV verification
 
-A warm run on the reference Samsung UN43U8000FBXZA / firmware 1300.8 / Tizen 9 / ARMv7
-used a temporary maintainer-controlled SDK/root provider. The public collector installed
-and launched its diagnostic widget, captured its fresh ProductInfo report, staged and ran
-the pinned native inspector, matched the seven profile facts, and reconciled its temporary
-package and uploads. The same boot, root and launcher processes remained, and four protected
-runtime/recovery files matched their original hashes. The dashboard foreground was reported
-again after Home. No reboot was required.
+The reviewed public `owner-sdk-root` provider was exercised once end-to-end on the
+reference Samsung UN43U8000FBXZA / firmware T-X22UDFAKUC-0090-1300.8 / Tizen 9 / ARMv7
+/ .NET 6.0.9 with an owner-private config, an official owner-signed Facts widget and an
+inspector built from the checked sources. The SDK raw-identity pin matched; temporary root
+was authenticated with uid/euid 0; root staging was cleaned; the original `/etc/passwd`
+and SDB key hashes were unchanged.
+
+The full CLI installed and launched its diagnostic widget, captured its fresh ProductInfo
+report, staged and ran the pinned native inspector, joined all seven facts and wrote the
+exact Helper config. The SDK uninstalled only its own diagnostic package and removed its
+uploads and run directory. An independent physical root read confirmed the package, both
+payload/data roots and the run directory absent, four protected runtime hashes unchanged,
+and boot/control-service/dashboard PIDs unchanged; Home was requested. No reboot was
+required. The complete collection took 570.579 s (~9 min 30 s) because of 17 isolated
+root probes.
 
 The running Helper then loaded the exact generated `helper-preflight-config.json` through
-its normal CLI and authenticated HTTP interface. It displayed the seven matching facts,
-kept every change action unavailable and exposed no identity, token or source path in HTTP.
-These are fresh observations supplied as saved files to the Helper; the Helper has no new
-live-collection HTTP route. That evidence used a private parent adapter before the public
-provider existed; public-provider hardware verification and hardware restore remain pending.
+its normal CLI and authenticated HTTP interface. It displayed the seven matching facts with
+sources, kept every change action unavailable and exposed no identity, token or source path
+in HTTP. These are fresh observations supplied as saved files to the Helper; the Helper has
+no new live-collection HTTP route and its live guided flow is not wired.
+
+This is a one-time ADVANCED diagnostic with manual per-owner setup; it makes no cold-boot
+improvement or consumer-install claim. Fresh-stock end-to-end verification, consumer
+install/cleanup and hardware restore remain unavailable until independent hardware Rescue
+and full restore are verified. No stock firmware, packages, keys or binaries are
+distributed, and no TV reboot or startup/launcher change was made for this feature. After
+the hardware run, small changes (1 MiB boundary, standard numeric RFC 1918 range form,
+synthetic example addresses, source-guard passwd colon parsing) were verified offline; the
+provider root core is the hardware-tested reference path.
 
 The native inventory is a snapshot taken while the diagnostic widget is installed. Future
 app-selection consumers must exclude that diagnostic package or obtain a post-cleanup

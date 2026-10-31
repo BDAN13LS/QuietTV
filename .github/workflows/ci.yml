@@ -41,6 +41,8 @@ jobs:
           .venv/bin/python -m pip install -r helper/requirements-bootstrap.txt
       - name: Unit, fake-TV and stdio MCP tests (no device, no network to any TV)
         run: .venv/bin/python -m pytest "${PKG}/tests" -q
+      - name: Public provider unit tests (fake SDK/root, no device)
+        run: .venv/bin/python -m unittest discover -s tests -p 'test_public_provider_liveops.py' -q
       - name: Backup, restore-plan and export tests (offline fixtures only)
         run: |
           .venv/bin/python -m unittest discover -s tests -p 'test_public_toolkit_*.py' -q
@@ -89,6 +91,22 @@ jobs:
           python -m unittest discover -s tests -p test_public_host_source.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s tests -p test_tv_inspector.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Public provider unit tests (fake SDK/root; Windows ACL cases execute)
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -p test_public_provider_liveops.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build provider artifacts from source and re-check the manifest (no device)
+        shell: pwsh
+        run: |
+          $dotnet = (Get-Command dotnet).Source
+          $out = Join-Path $env:RUNNER_TEMP ("quiettv-provider-artifacts-" + [guid]::NewGuid().ToString("N"))
+          python tools/tv-collect/provider_build.py --dotnet $dotnet --out-dir $out
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tv-collect/provider_build.py --check (Join-Path $out "provider-artifacts.json")
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Compile isolated Ecore probe and run its pure FD comparator
