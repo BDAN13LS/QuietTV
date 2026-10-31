@@ -27,7 +27,7 @@ That grant does not relicense anything listed in this file.
 
 ## Frontend runtime packages
 
-Installed runtime packages. Build tools are not shipped in the TV bundle. Native app artwork remains the respective brandsâ€™ artwork; IPTV logo and wallpaper were generated for this project.
+Installed runtime packages. Build tools are not shipped in the TV bundle. Native app artwork remains the respective brands’ artwork; IPTV logo and wallpaper were generated for this project.
 
 ## @noriginmedia/norigin-spatial-navigation 3.3.0
 
@@ -392,4 +392,4 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ## Simple Icons brand marks
 
-Netflix, YouTube and Apple TV glyphs come from https://github.com/simple-icons/simple-icons under CC0-1.0. Original paths are unchanged; a fill color was added. See artwork/brand-provenance.json and artwork/simple-icons-LICENSE.md. Brand names and marks remain the property of their respective owners. Other app PNG artwork was copied from this TVâ€™s installed app catalog.
+Netflix, YouTube and Apple TV glyphs come from https://github.com/simple-icons/simple-icons under CC0-1.0. Original paths are unchanged; a fill color was added. See artwork/brand-provenance.json and artwork/simple-icons-LICENSE.md. Brand names and marks remain the property of their respective owners. Other app PNG artwork was copied from this TV’s installed app catalog.
