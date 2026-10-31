@@ -33,8 +33,8 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "size": 5975,
-      "sha256": "a0e55ae0caba917a068b12395d788deae9f4f8ee56a327a12e729465c61d8d7b"
+      "size": 7010,
+      "sha256": "c6947e4f43012ce1de14e5c73b43f2d8e17deec5d409bba481570f925f52b291"
     },
     {
       "path": ".gitignore",
@@ -53,13 +53,13 @@
     },
     {
       "path": "README.md",
-      "size": 7445,
-      "sha256": "17a79234af0682f1896a73d0ecaf690bdb98a9b5e3ada54a88708c6406aebfa6"
+      "size": 7873,
+      "sha256": "38b5173d376ceea89ff811e9c922aa505b09f81b0c9fcbd7c652a6fe57e5e790"
     },
     {
       "path": "THIRD-PARTY-NOTICES.md",
-      "size": 19718,
-      "sha256": "59a846a1f90f9dfc596b436950e9e9bf6436901c8eca19bbb18d57d1016b699b"
+      "size": 20421,
+      "sha256": "35321ccdc84b8fe2080f818e32a97e8111a0d9acde6e572b74d14ccfed12e703"
     },
     {
       "path": "docs/AI-SETUP-PROMPT.md",
@@ -83,13 +83,18 @@
     },
     {
       "path": "docs/ROADMAP.md",
-      "size": 3616,
-      "sha256": "be804062b1813b50497509d84086c22db380eca1bd536147a9d962b72d793984"
+      "size": 3952,
+      "sha256": "7d3b8d447fda68ee0c8e0ded781d47cc03b4a8e388574525e52edc3c8e7522e3"
     },
     {
       "path": "docs/drafts/README-consumer.md",
       "size": 7164,
       "sha256": "fa29c88476ed6368adbb0d8245040df30398ae726391e330b4a94bab0f229471"
+    },
+    {
+      "path": "docs/plans/public-connection-provider-oct30.md",
+      "size": 13185,
+      "sha256": "0a27f498c220304a096d5251bfc3fc50fb7fe56336203357bec53689290a72ba"
     },
     {
       "path": "docs/screenshots/home-day.png",
@@ -108,8 +113,8 @@
     },
     {
       "path": "docs/superpowers/plans/2026-10-30-live-report-collection.md",
-      "size": 6085,
-      "sha256": "f18f39d05187a84cff57d83d23e672334cdc540d5fa35c99e36cd93609e62b93"
+      "size": 8640,
+      "sha256": "37a30e096d428ec330fd38fe70504ad33688737a4f18999298c4e7870fa6a264"
     },
     {
       "path": "frontend/index.html",
@@ -663,8 +668,8 @@
     },
     {
       "path": "public-llm/tests/test_public_tools.py",
-      "size": 8175,
-      "sha256": "b1aab6c87a9c1fa98346d92a0cf50005aca6b130af357203a1bb2ea2e5fc0c75"
+      "size": 8525,
+      "sha256": "cf1173dfa4b7806638d5c0fe81d6ff656fd4430681cf27899f01e71e8f303678"
     },
     {
       "path": "public-llm/tests/test_redaction.py",
@@ -698,8 +703,8 @@
     },
     {
       "path": "public-llm/tools/public_source_guard.py",
-      "size": 10049,
-      "sha256": "871885947a984e9eff067b265ace2e6f1f528108769b6ce752cf3b66667dccae"
+      "size": 10054,
+      "sha256": "e2ae923cd92e98d5756caa2edef2d5215d1f8a8cdfa5b96db72180bad5ae7f42"
     },
     {
       "path": "public-toolkit/README.md",
@@ -763,8 +768,8 @@
     },
     {
       "path": "public-toolkit/export-allowlist.json",
-      "size": 7025,
-      "sha256": "87358565e855e51cef5ef444e8b34d33565d094584cddafaf419271d03f18c77"
+      "size": 7466,
+      "sha256": "68f6b269cc3b90570867ec809b71eda6896a8bf935722621e30b4e9d282e80d0"
     },
     {
       "path": "public-toolkit/frontend-export.json",
@@ -853,8 +858,8 @@
     },
     {
       "path": "public-toolkit/tvkit/liveops.py",
-      "size": 12326,
-      "sha256": "06e814af5a890c5e624b0f5abd6e96937b5f057a9c5ebdeb5545dab1b3b083ee"
+      "size": 12340,
+      "sha256": "5c910586e7a1ca2ce31edf87bdffdd0e4ffe6330faa87cb5eaa48fe30265899d"
     },
     {
       "path": "public-toolkit/tvkit/package_stream.py",
@@ -882,6 +887,41 @@
       "sha256": "156572fa24325a742280c2b4dd37eadf533a7b47e798b2ea60b62aac71366fd0"
     },
     {
+      "path": "public-toolkit/tvkit/provider/__init__.py",
+      "size": 964,
+      "sha256": "2a1715b07ade00f1e22c4c38a5f0cb4a5f74631b49f8af5a72741538bca94558"
+    },
+    {
+      "path": "public-toolkit/tvkit/provider/channel.py",
+      "size": 16235,
+      "sha256": "c35659821233f2f37e1e14e87d12b6b60e59796a129bc808ef0e13c26490c97a"
+    },
+    {
+      "path": "public-toolkit/tvkit/provider/commands.py",
+      "size": 9630,
+      "sha256": "337f7fafee0d1c0424dd510b69d6a1900fc7023a12e425286bd980e124b3e4e2"
+    },
+    {
+      "path": "public-toolkit/tvkit/provider/config.py",
+      "size": 14448,
+      "sha256": "e72cf0194d3ef721acc26f4d09e338d808949d3be5a1b9e6f39da00b2ffd5e46"
+    },
+    {
+      "path": "public-toolkit/tvkit/provider/proc.py",
+      "size": 6163,
+      "sha256": "24821a6aab771daaba36454bde900fb43fbaf17f728784d21f9c353f1852d5a8"
+    },
+    {
+      "path": "public-toolkit/tvkit/provider/session.py",
+      "size": 26998,
+      "sha256": "312fb344dc4f34caecb50b99e0f316f8a9722a4c127bc9de46eef735e2382344"
+    },
+    {
+      "path": "public-toolkit/tvkit/provider/worker.py",
+      "size": 12482,
+      "sha256": "739b5031a17fd8f5fe380c70e0b3b09aed8fc00909384d8b9c52e96206315cda"
+    },
+    {
       "path": "public-toolkit/tvkit/recovery2.py",
       "size": 37899,
       "sha256": "1f30f5e9e33fc6cdc525edace0d22775ca6af343bae5fb05bc18f3b1cf9ec756"
@@ -905,6 +945,66 @@
       "path": "public-toolkit/tvkit_cli.py",
       "size": 435,
       "sha256": "0e7d4bbef5afe0f7b6273abe63a4b47f99464489b4d7489174a8d61d35f33785"
+    },
+    {
+      "path": "public-toolkit/vendor/NOTICE.md",
+      "size": 1864,
+      "sha256": "2987c90bef4b22ac85db78d92760f55d0347273cbb12723655c435155af46531"
+    },
+    {
+      "path": "public-toolkit/vendor/UPSTREAM-LICENSE",
+      "size": 1212,
+      "sha256": "6c7356b59f6bc0e1cb461849538baae609ef0abf6b963ea565f9eec64efb4dec"
+    },
+    {
+      "path": "public-toolkit/vendor/root-payload-source/SamsungTvArchiveRoot.cs",
+      "size": 5570,
+      "sha256": "868ce8957a421931dc191bc9289dbbb31073a68b7cf02e53104a6a150ae1371e"
+    },
+    {
+      "path": "public-toolkit/vendor/root-payload-source/SamsungTvArchiveRoot.csproj",
+      "size": 583,
+      "sha256": "200a9f57f018067b201edda9d99b24295749fe4a54e751d6985710838c24a7c2"
+    },
+    {
+      "path": "public-toolkit/vendor/root-payload-source/SamsungTvRootAgent.cs",
+      "size": 27599,
+      "sha256": "3b53e8c9de66331ca5336f57bc8eba33adf66ca2860a29daedbbeb3a98ea8405"
+    },
+    {
+      "path": "public-toolkit/vendor/root-payload-source/SamsungTvRootAgent.csproj",
+      "size": 579,
+      "sha256": "aa37ba1eb29fd048cf810f98fed01da9b96c389dfefe4306d474c83fea7d1dde"
+    },
+    {
+      "path": "public-toolkit/vendor/samsung_tv_root/__init__.py",
+      "size": 63,
+      "sha256": "c01a308499f41c05553136a7a9e3d4c95117796a69f31ca449e792c742ba5912"
+    },
+    {
+      "path": "public-toolkit/vendor/samsung_tv_root/archive_root.py",
+      "size": 13102,
+      "sha256": "f0a303c22fe01cad8b95bb4f4ff8d4b121f5070f06397752ebaacb01806eec79"
+    },
+    {
+      "path": "public-toolkit/vendor/samsung_tv_root/doctor.py",
+      "size": 2613,
+      "sha256": "c36312206c4c015a3f537db897cd68b61e768f030ac7ab33f488ccc97acb2d6b"
+    },
+    {
+      "path": "public-toolkit/vendor/samsung_tv_root/resources.py",
+      "size": 2632,
+      "sha256": "70b66360ac7eba32d126d4d08f2a22ebee4847e8795cad0a8c4572c2a4e37af7"
+    },
+    {
+      "path": "public-toolkit/vendor/samsung_tv_root/root_agent.py",
+      "size": 23779,
+      "sha256": "ee959b0e3c315d819a2a0fe89f3a45b744cea7f0330482b8059a82893b2a9c87"
+    },
+    {
+      "path": "public-toolkit/vendor/samsung_tv_root/sdb.py",
+      "size": 14750,
+      "sha256": "9215bb40b427159912998d4f69f0beea71e5f48a1661e8b8a44c4d6e7707b2d7"
     },
     {
       "path": "rescue/README.md",
@@ -1005,6 +1105,11 @@
       "path": "tests/test_public_host_source.py",
       "size": 44860,
       "sha256": "2619a833ae5fa4cfd2a3780a36df22658babbbc9ef687061d2d904311fd883d4"
+    },
+    {
+      "path": "tests/test_public_provider_liveops.py",
+      "size": 87965,
+      "sha256": "6b8aa0b0eb8886de23b2c7bf0125a71b49fce81c1d87bd1f6715b41a85ada8f8"
     },
     {
       "path": "tests/test_public_toolkit_assemble_recovery2.py",
@@ -1168,13 +1273,18 @@
     },
     {
       "path": "tools/tv-collect/README.md",
-      "size": 10594,
-      "sha256": "b1b7480905e413869306b79045c38ca1eb6d5fdfdd87827532f37b48caf41943"
+      "size": 18843,
+      "sha256": "2bfe46f918a4a7564851fca3fbea702fc2228e29fd53f85e5f5d06c5f8840946"
     },
     {
       "path": "tools/tv-collect/collect.py",
-      "size": 5320,
-      "sha256": "550f2da19fd3f287c78e6bc6bf52e11266bea23d2e8e219aecf9c7c88c9a1bc3"
+      "size": 6281,
+      "sha256": "99455e8f778b8da4b99d88d625128f7b2b1771a6645bac1d5e6e09e75d76a5fd"
+    },
+    {
+      "path": "tools/tv-collect/provider_build.py",
+      "size": 13985,
+      "sha256": "b3bf51eb7ad50d8248e3135897f6f4438afa96e7a4e73285bb065323f74fe663"
     },
     {
       "path": "tools/tv-device-facts/README.md",
@@ -1350,8 +1460,12 @@
   ],
   "notExported": [
     {
+      "path": "frontend/",
+      "reason": "Launcher UI source. Exported only with --with-frontend, through public-toolkit/frontend-export.json and its transforms (unconfigured weather location, no icons extracted from the TV, PNG metadata removed)."
+    },
+    {
       "path": "app/",
-      "reason": "RELEASE BLOCKER: native .NET launcher host the TV runs (Program.cs, State.cs, RemoteGate.cs, WebFrontend.cs and others). Device-side and not positively audited for a public build. Without it the frontend has no TV-side host."
+      "reason": "Private deployed host tree remains excluded. A reviewed portable source candidate is positively exported file-by-file under launcher/host/, with an offline build and self-tests; it is not an installer. Also exported file-by-file as offline SOURCE CANDIDATES with their tests: the unsigned preview widget (launcher/widget/: bridge, config.xml template, tv-inputs.js) and its owner-data generator and packager (helper/owner_init.py, helper/build_widget.py). They are NOT a production widget. RELEASE BLOCKERS remain: the on-boot service and loopback backend, per-owner signing, the signed install, default-Home/startup setup, root and recovery integration, and hardware proof."
     },
     {
       "path": "boot/",
@@ -1363,7 +1477,7 @@
     },
     {
       "path": "vendor/",
-      "reason": "Third-party root payload. This toolkit is not a root bypass and does not redistribute it."
+      "reason": "Private vendor tree and prebuilt payloads remain excluded. The reviewed pinned source subset is published under public-toolkit/vendor/ with upstream provenance and notices; no opaque binaries or owner setup files are distributed."
     },
     {
       "path": "private/",
@@ -1371,15 +1485,19 @@
     },
     {
       "path": "docs/ (except docs/screenshots/, docs/CLEANUP-STATUS.md and docs/INSTALL-OPTIONS.md)",
-      "reason": "Private session notes remain excluded; only explicitly reviewed cleanup status, install options and screenshots are published."
+      "reason": "Private session notes remain excluded. Only the explicitly reviewed cleanup status, install options and screenshots ship, after the same scans."
     },
     {
       "path": "run_root.py, root_compat.py, receive_backup.py, tools/sdb-tunnel-client.cjs",
-      "reason": "Privileged transport and root tooling. Stays with the owner; the public toolkit ships no transport."
+      "reason": "Owner-specific transport, compatibility wrappers, backup receiver and tunnel helpers remain private. The reviewed owner-configured diagnostic provider is published under public-toolkit/tvkit/provider/; consumer startup and recovery integration remain pending."
     },
     {
       "path": "*.json, *.txt, *.png at the repository root",
       "reason": "Raw device captures, results and screenshots from the owner's TV."
+    },
+    {
+      "path": "public-llm/",
+      "reason": "Export this package separately using its positive tracked file list and public_source_guard.py, including actual-owner deny hashes. Its documented synthetic MAC/LAN and planted-secret fixtures intentionally fail this toolkit generic scanner. Do not relax either scanner or publish the private repository/history."
     }
   ],
   "absentOptional": [],
