@@ -93,8 +93,8 @@
     },
     {
       "path": "docs/plans/public-connection-provider-oct30.md",
-      "size": 13185,
-      "sha256": "0a27f498c220304a096d5251bfc3fc50fb7fe56336203357bec53689290a72ba"
+      "size": 13244,
+      "sha256": "12e2bfc9077484cbc072aab6a8aa3370fc50033150a0c1e8b8f4d062cd9f4c11"
     },
     {
       "path": "docs/screenshots/home-day.png",
@@ -114,7 +114,7 @@
     {
       "path": "docs/superpowers/plans/2026-10-30-live-report-collection.md",
       "size": 8640,
-      "sha256": "37a30e096d428ec330fd38fe70504ad33688737a4f18999298c4e7870fa6a264"
+      "sha256": "1be7216173e5ab10a00518015a8e6adf617a0eee15ec0e225780bdc660ea7a7b"
     },
     {
       "path": "frontend/index.html",
@@ -703,8 +703,8 @@
     },
     {
       "path": "public-llm/tools/public_source_guard.py",
-      "size": 10054,
-      "sha256": "e2ae923cd92e98d5756caa2edef2d5215d1f8a8cdfa5b96db72180bad5ae7f42"
+      "size": 10050,
+      "sha256": "145aec7578f7d22a75786090418348873aca16bb78349a485ac0db3cdc618b71"
     },
     {
       "path": "public-toolkit/README.md",
@@ -903,8 +903,8 @@
     },
     {
       "path": "public-toolkit/tvkit/provider/config.py",
-      "size": 14448,
-      "sha256": "e72cf0194d3ef721acc26f4d09e338d808949d3be5a1b9e6f39da00b2ffd5e46"
+      "size": 14567,
+      "sha256": "8652f9bedfd22e76b6a88ef89294386b7bd70c053aa2a9b31ddb4bd3d6d34010"
     },
     {
       "path": "public-toolkit/tvkit/provider/proc.py",
@@ -1108,8 +1108,8 @@
     },
     {
       "path": "tests/test_public_provider_liveops.py",
-      "size": 87965,
-      "sha256": "6b8aa0b0eb8886de23b2c7bf0125a71b49fce81c1d87bd1f6715b41a85ada8f8"
+      "size": 90116,
+      "sha256": "6be62b52025e1e2a5b58922aa45004357f37c5f917144a3d17069c0e5ebf11c5"
     },
     {
       "path": "tests/test_public_toolkit_assemble_recovery2.py",
@@ -1273,8 +1273,8 @@
     },
     {
       "path": "tools/tv-collect/README.md",
-      "size": 18843,
-      "sha256": "2bfe46f918a4a7564851fca3fbea702fc2228e29fd53f85e5f5d06c5f8840946"
+      "size": 18825,
+      "sha256": "16d860ded4702699c7230c9629bfc4a6a38e9012e226425b733794428aa4314d"
     },
     {
       "path": "tools/tv-collect/collect.py",
