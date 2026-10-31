@@ -54,7 +54,7 @@ RULES: list[tuple[str, re.Pattern[str]]] = [
 MAC = re.compile(r"(?i)(?<![0-9a-f:])[0-9a-f]{2}(?::[0-9a-f]{2}){5}(?![0-9a-f:])")
 IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 WIN_USER = re.compile(r"(?i)\b[a-z]:\\+users\\+([a-z0-9][^\\/\s\"'`]*)")
-POSIX_USER = re.compile(r"(?:/home/|/Users/)([A-Za-z0-9][^/\s\"'`\\]*)")
+POSIX_USER = re.compile(r"(?:/home/|/Users/)([A-Za-z0-9][^/:\s\"'`\\]*)")
 TOKEN = re.compile(r"[A-Za-z0-9:._-]{4,}")
 
 
@@ -77,7 +77,7 @@ def scan_text(text: str, deny: set[str], *, generic: bool = True) -> list[str]:
         if first & 1 or mac.upper() == "00:00:00:00:00:00":
             continue  # broadcast/multicast/null are never a device's own address
         if not mac.upper().startswith(ALLOWED_MAC_PREFIXES):
-            found.append(f"MAC address outside fixture ranges ({mac[:8]}…)")
+            found.append(f"MAC address outside fixture ranges ({mac[:8]}â€¦)")
     for raw in (IPV4.findall(text) if generic else []):
         try:
             ip = ipaddress.ip_address(raw)

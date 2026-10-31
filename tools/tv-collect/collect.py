@@ -1,15 +1,17 @@
 """Owner-invoked live report collection CLI (thin wrapper over tvkit.livecollect).
 
-This tool NEVER talks to a TV itself and NEVER runs a command. It resolves one
-adapter name from the toolkit's EMPTY reviewed registry and hands it to the
-public orchestrator; the privileged channel lives entirely in that parent-owned
-adapter. With no registered adapter the tool refuses and writes nothing.
+This tool NEVER talks to a TV itself and NEVER runs a command. Without
+``--provider-config`` it resolves one adapter name from the toolkit's EMPTY
+reviewed registry and hands it to the public orchestrator. With
+``--provider-config`` it accepts only the one fixed provider name
+``owner-sdk-root`` and loads that reviewed provider from the explicit
+owner-private configuration. With neither it refuses and writes nothing.
 
 There is no module-path/plugin loading, no shell/command argument, no SERVER or
 SERIAL input, no network address and no Helper HTTP route.
 
 CLI:
-    python collect.py --adapter <name> --out-dir <new dir> \
+    python collect.py --adapter <name> [--provider-config <private.json>] --out-dir <new dir> \
         --signed-wgt <file>.wgt --wgt-sha256 <64 hex> \
         --inspector-dll QuietTVInspect.dll --dll-sha256 <64 hex> \
         --inspector-runtimeconfig QuietTVInspect.runtimeconfig.json --runtimeconfig-sha256 <64 hex> \
@@ -36,6 +38,7 @@ if str(REPO_ROOT / "public-toolkit") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "public-toolkit"))
 from tvkit import livecollect as lc  # noqa: E402
 from tvkit import liveops  # noqa: E402
+from tvkit import provider  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -45,6 +48,9 @@ def main(argv: list[str] | None = None) -> int:
                     "Ships no adapter; refuses without one. No TV, signing or root work here.")
     ap.add_argument("--adapter", required=True,
                     help="name of a registered live-operations adapter (the public registry is empty)")
+    ap.add_argument("--provider-config",
+                    help="explicit owner-private JSON for the fixed owner-sdk-root provider "
+                         "(enables only that one name; omit to keep the empty registry refusal)")
     ap.add_argument("--out-dir", required=True,
                     help="NEW owner-private output directory OUTSIDE every repository")
     ap.add_argument("--signed-wgt", required=True, help="owner-signed diagnostic .wgt (package.Facts)")
@@ -66,11 +72,26 @@ def main(argv: list[str] | None = None) -> int:
                     help="explicitly assert the two observations come from the same TV")
     args = ap.parse_args(argv)
 
-    try:
-        ops = liveops.get_liveops(args.adapter)
-    except liveops.LiveOpsError as exc:
-        print("collect refused: " + str(exc), file=sys.stderr)
-        return 2
+    if args.provider_config is not None:
+        if args.adapter != provider.PROVIDER_NAME:
+            print("collect refused: unknown live-operations provider name; refusing",
+                  file=sys.stderr)
+            return 2
+        try:
+            ops = provider.load_provider(args.provider_config)
+        except provider.ProviderConfigError as exc:
+            print("collect refused: " + str(exc), file=sys.stderr)
+            return 2
+        except Exception:
+            print("collect refused: the provider configuration could not be loaded; refusing",
+                  file=sys.stderr)
+            return 2
+    else:
+        try:
+            ops = liveops.get_liveops(args.adapter)
+        except liveops.LiveOpsError as exc:
+            print("collect refused: " + str(exc), file=sys.stderr)
+            return 2
     try:
         summary = lc.collect_reports(
             ops=ops, out_dir=args.out_dir, package_id=args.package_id,

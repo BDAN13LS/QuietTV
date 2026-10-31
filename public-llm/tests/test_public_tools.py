@@ -166,3 +166,10 @@ def test_attestation_rejects_incomplete_records():
         doc = _attestation(sha)
         doc[field] = value
         assert attest.check(doc, sha), field
+
+
+def test_passwd_home_field_ends_at_colon():
+    # Unix passwd uses colon as a field separator, not part of a user name.
+    assert guard.scan_text("owner:x:0:0:owner:/home/owner:/bin/sh", set()) == []
+    private_home = J(["/ho", "me/", "someone-private", ":/bin/sh"])
+    assert "personal user path" in guard.scan_text(private_home, set())
