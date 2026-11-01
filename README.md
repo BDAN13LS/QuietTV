@@ -43,6 +43,14 @@ are planned. See the
 [install options](docs/INSTALL-OPTIONS.md) and
 [consumer install design](docs/CONSUMER-INSTALL-DESIGN-2026-10-27.md).
 
+Advanced developer tooling can now [collect fresh device reports](tools/tv-collect/README.md)
+with the reviewed `owner-sdk-root` provider and produce inputs for the Helper. It is a
+manual, owner-configured **ADVANCED diagnostic**, one TV at a time: the owner supplies an
+explicit private config (SDK and OpenSSL paths and hashes, SDK DUID pin, private IPv4
+target/callback, trusted profile and policy), an owner-signed Facts widget and the built
+artifact hashes. It was run once end-to-end on the reference TV; the guided consumer flow
+in the Helper is not wired.
+
 On the reference TV, Home, the remote, native app launch, Settings, the input picker,
 Store opening and unattended root recovery were tested.
 
@@ -95,19 +103,23 @@ Verify results with status/captures. Distinguish observed from untested outcomes
 - [x] Package/security-metadata capture and verified PC readback on the reference TV.
 - [x] Local AI/MCP tools for status, controls, screenshots and optional wake.
 - [x] Streamed PC backup assembly with measured memory regression tests.
-- [x] Reference-TV firmware/model probe and a published read-only diagnostic provider.
-- [ ] A public restore/root channel. The RecoveryTransport adapter contract and the
-      recovery plan and signed run journal are implemented and offline-tested in the
-      toolkit, but no adapter ships and none of it is hardware-verified.
+- [x] Advanced owner-configured CLI collection with the reviewed public provider on the reference TV (manual per-owner setup).
+- [ ] Automatic firmware verification and guided consumer connection integration.
+- [ ] A public restore/root channel. The RecoveryTransport adapter contract, the
+      recovery/2 restore plan and the signed run journal are implemented and
+      offline-tested in the private SamsungTV repository, but are not in this
+      public release and are not hardware-verified.
 - [ ] Complete backup/restore and independent Rescue, verified on hardware.
 - [ ] Guided consumer installer and cleanup selection.
 - [ ] Verify Store app-update installation, DRM playback and physical HDMI video.
 - [ ] Resolve the IPTV black picture and remaining cold-boot visual issues.
 
+Upcoming work includes browser-assisted setup and additional widget/layout controls.
+See the [full roadmap](docs/ROADMAP.md). Checked items describe the reference TV or
+published components; they do not mean the complete consumer installer is finished.
 Status terms: "published" means in this repository; "hardware-verified" means run
 on the reference TV; "offline-tested" means unit/contract tests with synthetic
-adapters only. Checked items describe the reference TV or published components;
-they do not mean the complete consumer installer is finished.
+adapters only.
 
 ## Development and evidence
 

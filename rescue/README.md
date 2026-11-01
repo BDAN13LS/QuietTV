@@ -9,6 +9,12 @@ Support > Self Diagnosis / Reset, or Samsung support).
 Nothing here has run against hardware. Every restore test uses one synthetic
 package and a fake in-memory adapter.
 
+> **Release note:** the recovery/2 restore plan, the signed run journal
+> (`tvkit-rescue-journal/1`) and the `RecoveryTransport` contract described in
+> this guide are implemented and offline-tested in the private SamsungTV
+> repository. They are not part of this public release and are not
+> hardware-verified; no adapter ships.
+
 ## Commands
 
 ```
