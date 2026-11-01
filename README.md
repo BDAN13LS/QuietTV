@@ -105,6 +105,10 @@ Verify results with status/captures. Distinguish observed from untested outcomes
 - [x] Streamed PC backup assembly with measured memory regression tests.
 - [x] Advanced owner-configured CLI collection with the reviewed public provider on the reference TV (manual per-owner setup).
 - [ ] Automatic firmware verification and guided consumer connection integration.
+- [ ] A public restore/root channel. The RecoveryTransport adapter contract, the
+      recovery/2 restore plan and the signed run journal are implemented and
+      offline-tested in the private SamsungTV repository, but are not in this
+      public release and are not hardware-verified.
 - [ ] Complete backup/restore and independent Rescue, verified on hardware.
 - [ ] Guided consumer installer and cleanup selection.
 - [ ] Verify Store app-update installation, DRM playback and physical HDMI video.
@@ -113,6 +117,9 @@ Verify results with status/captures. Distinguish observed from untested outcomes
 Upcoming work includes browser-assisted setup and additional widget/layout controls.
 See the [full roadmap](docs/ROADMAP.md). Checked items describe the reference TV or
 published components; they do not mean the complete consumer installer is finished.
+Status terms: "published" means in this repository; "hardware-verified" means run
+on the reference TV; "offline-tested" means unit/contract tests with synthetic
+adapters only.
 
 ## Development and evidence
 
