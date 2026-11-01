@@ -28,11 +28,20 @@ These checks do not establish a full stock-TV installation or a complete live re
 - [ ] Integrate observed device/firmware facts into guided setup and exact profile matching; never infer a match from Unknown.
 - [x] Publish the owner-configured provider and per-owner setup documentation (manual, no default target or credentials).
 - [ ] Complete restore support for the loader references used by Tizen packages.
+      The recovery/2 schema, one-run restore plan and signed run journal are
+      implemented and offline-tested in the toolkit; the real adapter and
+      hardware restore are not.
 - [ ] Verify full off-TV backup restoration and independent Rescue on hardware.
 - [ ] Connect a published live-collection provider to the Helper guided flow.
 - [ ] Finish the Windows Helper, per-owner signing and guided installation.
 - [ ] Add reviewed component selection and individual/full restore controls.
 - [ ] Enable consumer installation and cleanup only after backup/recovery gates pass.
+
+Offline recovery engine: the recovery/2 validator and one-run restore plan, the
+signed run journal, and the RecoveryTransport adapter contract are implemented
+and unit/contract-tested in the toolkit. They are not hardware-verified and no
+adapter ships. Independent hardware Rescue and a complete stock restore are the
+gate before any consumer installation.
 
 ## Verification and upcoming improvements
 
