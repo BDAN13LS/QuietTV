@@ -20,25 +20,21 @@ package and a fake in-memory adapter.
 ```
 python rescue/main.py validate --capsule PATH --profile ID [--device-facts FACTS.json]
 python rescue/main.py plan     --capsule PATH --profile ID
-python rescue/main.py restore  --capsule PATH --profile ID [--apply --transport NAME] [--resume --journal J --public-key K]
+python rescue/main.py restore  --capsule PATH --profile ID [--apply --transport NAME]
 python rescue/main.py rehearse --capsule PATH --profile ID [--apply --transport NAME]
-python rescue/main.py accept   --capsule PATH --profile ID --device-facts FACTS.json --journal J --public-key K --private-key K --milestone M
 ```
 
 `restore` and `rehearse` are dry runs without `--apply`. With `--apply` the
 adapter name is resolved only from the empty registry, so they refuse (exit 3).
-`--resume` reads the signed run journal, verifies it against the exact run, and
-skips already-accepted owner checks. `accept` records one owner acceptance
-(`verify-control` before `verify-control-final`), signed with the owner's Rescue
-key. Rescue never loads adapter code from a path or a config file. The library
+Rescue never loads adapter code from a path or a config file. The library
 functions `restore()` and `rehearse()` take an injected, implemented
-`RecoveryTransport` (tests now, the owner's own code later).
+`RescueTransport` (tests now, the owner's own code later).
 
-Exit codes: 0 ok (validate, dry run, rehearsal, accept), 1 refused (nothing
-changed), 2 usage, 3 no implemented adapter (nothing changed), 4 adapter-verified
-with owner checks still pending (each acceptance is recorded in the signed
-journal; Rescue never marks the owner's own checks passed), 5 stopped partway or
-failed read-back (the TV may be partly changed).
+Exit codes: 0 ok (validate, dry run, rehearsal), 1 refused (nothing changed),
+2 usage, 3 no implemented adapter (nothing changed), 4 adapter-verified, or
+already matching, and the owner's own checks are still pending (Rescue keeps
+no record that they were ever done), 5 stopped partway or failed read-back
+(the TV may be partly changed).
 
 ## What the gate does before any write
 
@@ -48,11 +44,9 @@ failed read-back (the TV may be partly changed).
 3. Refuses `tvkit-profile/2` again (defence in depth): capsule/1 cannot bind
    firmware build or region.
 4. Re-validates the capsule against those facts (bytes and device identity).
-5. Refuses startup/Home key changes; `ourPackages` (launcher/root-helper)
-   removal is gated behind the signed journal's owner acceptance.
-6. Refuses an adapter that is not a `RecoveryTransport` or was not proven on
-   this exact profile (`profile_digests`), then checks every capability the
-   run needs.
+5. Refuses capsules with `ourPackages` (launcher/root-helper removal needs an
+   independently accepted final control check) or startup/Home key changes.
+6. Checks every capability the run needs.
 7. Inspects every target with typed evidence. Rescue decides "identical"
    itself: absent → restore, identical → skip, anything else (for example a
    newer version) → refuse the whole run. Registry fields: three-way
@@ -68,7 +62,15 @@ but it cannot detect an adapter that lies.
 The plan is cut before its first manual-acceptance step. Rescue never marks
 the owner's checks (Home, remote, Settings, sources, Store) as passed.
 
-## Not done yet
+## Development status (private repository, not in this public release)
+
+The sections below describe development in the private SamsungTV repository.
+The recovery/2 restore plan, the signed run journal, the owner-acceptance
+(`accept`/`--resume`) flow and the `RecoveryTransport` contract are implemented
+and offline-tested there, but are not in this public release, are not
+hardware-verified, and no adapter ships.
+
+### Not done yet
 
 - **Rescue validates `tvkit-recovery/2` offline, but does not restore it.**
   The `validate` command dispatches through `recovery2.validate_any` and
@@ -94,7 +96,7 @@ the owner's checks (Home, remote, Settings, sources, Store) as passed.
   typed by hand).
 - Bundling Rescue with the Helper and copying it to owner storage (D6).
 
-## Design (adapter contract D5b is built; the rest is planned, nothing proven on hardware)
+### Design (adapter contract D5b is built; the rest is planned, nothing proven on hardware)
 
 **Adapter (D5b) — built.** The contract `RecoveryTransport` now lives in
 `tvkit/transport.py` (replacing `RescueTransport`), along with the frozen
@@ -171,8 +173,8 @@ complete restore spans more than one session. Each owner-acceptance milestone
 is recorded in the signed run journal (keyed to the capsule/profile/evidence
 digests), and the next invocation resumes from the last recorded milestone;
 Rescue never synthesizes an owner check. The signed `tvkit-rescue-journal/1`
-format and its Ed25519 sign/verify are now implemented in
-`tvkit/rescue_journal.py`; the resume wiring is still to build.
+format, its Ed25519 sign/verify, and the `resume()`/`accept()` wiring (with the
+`--resume`/`accept` CLI) are implemented in the private repository.
 
 **Bundle (D6).** `QuietTV-Rescue/`: the embeddable Python runtime, `rescue/`,
 `tvkit/`, `bootstrap/`, the adapter, the per-profile `externalRefPolicy` and
