@@ -12,6 +12,12 @@ This is the only verified profile; other models and firmware are not supported.
 and live restore tool are still being built. Source and developer tools are available;
 there is no ready-to-install release yet.
 
+**Development status (3 November 2026):** A revised Home / Live TV / Apps dashboard
+is being validated in a separate, private development branch. It is **not the
+published launcher or an installed TV update**. Screenshots below document the
+older public launcher. The generic MCP controls an already-configured TV; private
+IPTV, signing, deployment and rollback tooling are not distributed here.
+
 ## What it changes on the reference TV
 
 | | Summary |
@@ -30,7 +36,7 @@ this is not proof of zero tracking. Exact inventory:
 
 ![QuietTV home screen in night mode with dark scenic artwork, app row and recent apps](docs/screenshots/home-night.png)
 
-*Desktop renders of the current launcher at 1920×1080, using sample recent-app history.
+*Desktop renders of the public launcher at 1920×1080, using sample recent-app history.
 They are not photos of a TV. App availability varies by TV.*
 
 ## Get started
