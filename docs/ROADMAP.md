@@ -49,6 +49,7 @@ installation.
 - [ ] Verify an actual Store app-update transaction.
 - [ ] Verify DRM playback and physical HDMI video.
 - [ ] Fix the IPTV black-picture issue and verify picture, sound and channel switching.
+      The IPTV player is private and unpublished; its launcher integration is offline-tested only.
 - [ ] Improve the remaining cold-start visual handoff.
 - [ ] Add browser-assisted setup; standalone stock-TV URL installation remains unproven.
 - [ ] Expand widget and layout customization beyond the existing appearance/weather options.
