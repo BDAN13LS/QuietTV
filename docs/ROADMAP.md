@@ -44,6 +44,16 @@ this public release, not hardware-verified, and no adapter ships. Independent
 hardware Rescue and a complete stock restore are the gate before any consumer
 installation.
 
+## Development boundary (3 November 2026)
+
+A redesigned Home / Live TV / Apps UI and an experimental resident-player policy are being
+validated in the **private owner project**. Those changes have not been published in
+this repository or installed as a new reference-TV release. The existing public
+`quiettv` MCP remains a finite, owner-configured **TV controller**, not a stock-TV
+installer. Private signing, native deployment, IPTV and rollback adapters do not
+ship in the public toolkit. Consumer installation and restore remain gated on
+hardware-backed backup/recovery evidence.
+
 ## Verification and upcoming improvements
 
 - [ ] Verify an actual Store app-update transaction.
