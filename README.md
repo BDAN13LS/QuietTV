@@ -118,7 +118,9 @@ Verify results with status/captures. Distinguish observed from untested outcomes
 - [ ] Complete backup/restore and independent Rescue, verified on hardware.
 - [ ] Guided consumer installer and cleanup selection.
 - [ ] Verify Store app-update installation, DRM playback and physical HDMI video.
-- [ ] Resolve the IPTV black picture and remaining cold-boot visual issues.
+- [ ] Resolve the IPTV black picture and remaining cold-boot visual issues. The IPTV
+      player (guide, player and On Demand) is private and not in this repository; its
+      newer launcher integration is offline-tested only and not installed on the reference TV.
 
 Upcoming work includes browser-assisted setup and additional widget/layout controls.
 See the [full roadmap](docs/ROADMAP.md). Checked items describe the reference TV or
